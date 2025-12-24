@@ -275,3 +275,9 @@
 ## Navigation Improvements Phase 3
 - [x] Add breadcrumbs to Mini-Game page (Home > Command Center > Mini-Game)
 - [x] Add breadcrumbs to Triumphs page (Home > Command Center > Triumphs)
+
+## Page Transition Animations
+- [x] Create PageTransition component with fade/slide effects
+- [x] Integrate transitions into App.tsx router
+- [x] Add inline style animations for smooth enter/exit (150ms exit, 250ms enter)
+- [x] Test transitions across all pages (Dashboard, Topology, Crucible, etc.)

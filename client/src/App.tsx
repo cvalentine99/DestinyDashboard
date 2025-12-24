@@ -1,7 +1,7 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
-import { Route, Switch } from "wouter";
+import { Route, Switch, useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
@@ -12,21 +12,94 @@ import Topology from "./pages/Topology";
 import Crucible from "./pages/Crucible";
 import BungieIntegration from "./pages/BungieIntegration";
 import Triumphs from "./pages/Triumphs";
+import { useEffect, useState, useRef, ReactNode } from "react";
+
+// Page Transition Component
+function PageTransition({ children }: { children: ReactNode }) {
+  const [location] = useLocation();
+  const [displayChildren, setDisplayChildren] = useState(children);
+  const [transitionStage, setTransitionStage] = useState<"enter" | "exit" | "idle">("idle");
+  const previousLocation = useRef(location);
+  const isFirstRender = useRef(true);
+
+  useEffect(() => {
+    // Skip animation on first render
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      setDisplayChildren(children);
+      return;
+    }
+
+    if (location !== previousLocation.current) {
+      // Start exit animation
+      setTransitionStage("exit");
+      
+      // After exit animation, update children and start enter animation
+      const exitTimer = setTimeout(() => {
+        setDisplayChildren(children);
+        setTransitionStage("enter");
+        previousLocation.current = location;
+        
+        // Reset to idle after enter animation
+        const enterTimer = setTimeout(() => {
+          setTransitionStage("idle");
+        }, 300);
+        
+        return () => clearTimeout(enterTimer);
+      }, 150);
+      
+      return () => clearTimeout(exitTimer);
+    } else {
+      // Same location, just update children
+      setDisplayChildren(children);
+    }
+  }, [location, children]);
+
+  const getTransitionStyles = (): React.CSSProperties => {
+    switch (transitionStage) {
+      case "exit":
+        return {
+          opacity: 0,
+          transform: "translateY(8px) scale(0.995)",
+          transition: "all 150ms ease-out",
+        };
+      case "enter":
+        return {
+          opacity: 1,
+          transform: "translateY(0) scale(1)",
+          transition: "all 250ms ease-out",
+        };
+      default:
+        return {
+          opacity: 1,
+          transform: "translateY(0) scale(1)",
+        };
+    }
+  };
+
+  return (
+    <div style={{ ...getTransitionStyles(), minHeight: "100vh" }}>
+      {displayChildren}
+    </div>
+  );
+}
 
 function Router() {
   return (
-    <Switch>
-      <Route path="/" component={Home} />
-      <Route path="/dashboard" component={Dashboard} />
-      <Route path="/topology" component={Topology} />
-      <Route path="/settings" component={Settings} />
-      <Route path="/game" component={Game} />
-      <Route path="/crucible" component={Crucible} />
-      <Route path="/bungie" component={BungieIntegration} />
-      <Route path="/triumphs" component={Triumphs} />
-      <Route path="/404" component={NotFound} />
-      <Route component={NotFound} />
-    </Switch>
+    <PageTransition>
+      <Switch>
+        <Route path="/" component={Home} />
+        <Route path="/dashboard" component={Dashboard} />
+        <Route path="/topology" component={Topology} />
+        <Route path="/settings" component={Settings} />
+        <Route path="/game" component={Game} />
+        <Route path="/crucible" component={Crucible} />
+        <Route path="/bungie" component={BungieIntegration} />
+        <Route path="/triumphs" component={Triumphs} />
+        <Route path="/404" component={NotFound} />
+        <Route component={NotFound} />
+      </Switch>
+    </PageTransition>
   );
 }
 
