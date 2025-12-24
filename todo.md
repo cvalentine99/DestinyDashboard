@@ -126,3 +126,61 @@
 - [x] Build match correlation UI showing network + gameplay stats
 - [x] Auto-correlate matches by timestamp overlap
 - [x] Display performance insights (high latency = lower K/D correlation)
+
+## Mini-Game Upgrade - Engram Hunter Combat Edition
+
+### Combat System
+- [x] Add enemy types (Fallen Dreg, Vandal, Captain)
+- [x] Add enemy types (Hive Thrall, Acolyte, Knight)
+- [x] Add enemy types (Vex Goblin, Hobgoblin, Minotaur)
+- [x] Enemy AI with movement patterns and shooting
+- [x] Projectile system for enemy attacks
+- [x] Player health system with damage and death
+- [x] Hit detection and collision system
+
+### Guardian Abilities
+- [x] Class selection (Titan, Hunter, Warlock)
+- [x] Titan Shield ability with cooldown
+- [x] Hunter Dodge ability with i-frames
+- [x] Warlock Blink teleport ability
+- [x] Ability cooldown UI indicators
+- [x] Class-specific visual effects
+
+### Boss Fights
+- [x] Ogre boss with ground slam attack
+- [x] Servitor boss with void blasts
+- [x] Hydra boss with rotating shields
+- [x] Boss health bars with phases
+- [x] Boss spawn waves every N points
+- [x] Unique boss attack patterns
+
+### Power-ups
+- [x] Super meter that charges from kills
+- [x] Super activation with devastating attack
+- [x] Heavy ammo drops (rocket launcher burst)
+- [x] Overshield pickup (temporary damage reduction)
+- [x] Special ammo for weapon upgrades
+- [x] Power-up spawn system
+
+### Multiple Levels
+- [x] Cosmodrome environment (snow, ruins)
+- [x] Europa environment (ice, Bray facility)
+- [x] Dreaming City environment (taken corruption)
+- [x] Environment-specific hazards
+- [x] Level progression system
+- [x] Visual theme changes per level
+
+### Weapon System
+- [x] Auto Rifle (rapid fire, low damage)
+- [x] Hand Cannon (slow fire, high damage)
+- [x] Pulse Rifle (burst fire)
+- [x] Rocket Launcher (heavy, explosive)
+- [x] Weapon engram drops to switch weapons
+- [x] Weapon-specific visual effects
+
+### Multiplayer Leaderboards
+- [x] Real-time score submission
+- [x] Global leaderboard display
+- [x] Daily/weekly/all-time rankings
+- [x] Player name display on scores
+- [x] Live score updates during gameplay
