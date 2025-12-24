@@ -1,7 +1,8 @@
 // ExtraHop REST API Client - Based on actual API spec v1
 // Endpoints: /devices/search, /metrics, /records/search, /activitymaps/query, /detections/search
 
-import axios, { AxiosInstance } from "axios";
+import axios, { AxiosInstance, AxiosRequestConfig } from "axios";
+import { extrahopRateLimiter } from "./_core/rateLimiter";
 
 export interface ExtrahopCredentials {
   apiUrl: string;
@@ -199,6 +200,12 @@ export interface TopologyResponse {
   nodes: TopologyNode[];
 }
 
+/**
+ * ExtraHop API Client
+ *
+ * All API calls are rate-limited to prevent hitting appliance limits.
+ * Current limit: 100 requests per minute.
+ */
 export class ExtrahopClient {
   private client: AxiosInstance;
   private baseUrl: string;
@@ -216,14 +223,33 @@ export class ExtrahopClient {
     });
   }
 
+  /**
+   * Rate-limited GET request
+   */
+  private async rateLimitedGet<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
+    return extrahopRateLimiter.execute(async () => {
+      const response = await this.client.get<T>(url, config);
+      return response.data;
+    });
+  }
+
+  /**
+   * Rate-limited POST request
+   */
+  private async rateLimitedPost<T>(url: string, data?: object, config?: AxiosRequestConfig): Promise<T> {
+    return extrahopRateLimiter.execute(async () => {
+      const response = await this.client.post<T>(url, data, config);
+      return response.data;
+    });
+  }
+
   // ============ DEVICE ENDPOINTS ============
 
   /**
    * GET /devices - Retrieve all devices
    */
   async getDevices(params?: { limit?: number; offset?: number; search_type?: string; value?: string }): Promise<Device[]> {
-    const response = await this.client.get("/devices", { params });
-    return response.data;
+    return this.rateLimitedGet<Device[]>("/devices", { params });
   }
 
   /**
@@ -231,32 +257,28 @@ export class ExtrahopClient {
    * This is the primary way to find devices like the PS5
    */
   async searchDevices(params: DeviceSearchParams): Promise<Device[]> {
-    const response = await this.client.post("/devices/search", params);
-    return response.data;
+    return this.rateLimitedPost<Device[]>("/devices/search", params);
   }
 
   /**
    * GET /devices/{id} - Get a specific device by ID
    */
   async getDevice(id: number): Promise<Device> {
-    const response = await this.client.get(`/devices/${id}`);
-    return response.data;
+    return this.rateLimitedGet<Device>(`/devices/${id}`);
   }
 
   /**
    * GET /devices/{id}/activity - Get device activity (protocols used)
    */
   async getDeviceActivity(deviceId: number): Promise<{ from_time: number; until_time: number; stat_name: string }[]> {
-    const response = await this.client.get(`/devices/${deviceId}/activity`);
-    return response.data;
+    return this.rateLimitedGet<{ from_time: number; until_time: number; stat_name: string }[]>(`/devices/${deviceId}/activity`);
   }
 
   /**
    * GET /devices/{id}/ipaddrs - Get IP addresses for a device
    */
   async getDeviceIpAddresses(deviceId: number): Promise<{ ipaddr: string; from: number; until: number }[]> {
-    const response = await this.client.get(`/devices/${deviceId}/ipaddrs`);
-    return response.data;
+    return this.rateLimitedGet<{ ipaddr: string; from: number; until: number }[]>(`/devices/${deviceId}/ipaddrs`);
   }
 
   /**
@@ -303,8 +325,7 @@ export class ExtrahopClient {
    * This is the core endpoint for getting network performance data
    */
   async queryMetrics(params: MetricQuery): Promise<MetricResult> {
-    const response = await this.client.post("/metrics", params);
-    return response.data;
+    return this.rateLimitedPost<MetricResult>("/metrics", params);
   }
 
   /**
@@ -377,8 +398,7 @@ export class ExtrahopClient {
    * Use this for detailed connection/flow data
    */
   async searchRecords(params: RecordQuery): Promise<any> {
-    const response = await this.client.post("/records/search", params);
-    return response.data;
+    return this.rateLimitedPost<any>("/records/search", params);
   }
 
   /**
@@ -427,8 +447,7 @@ export class ExtrahopClient {
    * Shows device relationships and communication patterns
    */
   async queryTopology(params: TopologyQuery): Promise<TopologyResponse> {
-    const response = await this.client.post("/activitymaps/query", params);
-    return response.data;
+    return this.rateLimitedPost<TopologyResponse>("/activitymaps/query", params);
   }
 
   /**
@@ -455,16 +474,14 @@ export class ExtrahopClient {
    * POST /detections/search - Search for security detections
    */
   async searchDetections(params: DetectionSearchParams): Promise<{ detections: Detection[] }> {
-    const response = await this.client.post("/detections/search", params);
-    return response.data;
+    return this.rateLimitedPost<{ detections: Detection[] }>("/detections/search", params);
   }
 
   /**
    * GET /detections/{id} - Get a specific detection
    */
   async getDetection(id: number): Promise<Detection> {
-    const response = await this.client.get(`/detections/${id}`);
-    return response.data;
+    return this.rateLimitedGet<Detection>(`/detections/${id}`);
   }
 
   /**
@@ -497,13 +514,12 @@ export class ExtrahopClient {
     port2?: number;
     output?: "pcap" | "keylog_txt" | "pcapng" | "zip";
   }): Promise<ArrayBuffer> {
-    const response = await this.client.post("/packets/search", params, {
+    return this.rateLimitedPost<ArrayBuffer>("/packets/search", params, {
       responseType: "arraybuffer",
       headers: {
         Accept: "application/vnd.tcpdump.pcap",
       },
     });
-    return response.data;
   }
 
   /**
@@ -561,16 +577,14 @@ export class ExtrahopClient {
    * GET /alerts - Get all alerts
    */
   async getAlerts(): Promise<Alert[]> {
-    const response = await this.client.get("/alerts");
-    return response.data;
+    return this.rateLimitedGet<Alert[]>("/alerts");
   }
 
   /**
    * GET /alerts/{id} - Get alert by ID
    */
   async getAlert(id: number): Promise<Alert> {
-    const response = await this.client.get(`/alerts/${id}`);
-    return response.data;
+    return this.rateLimitedGet<Alert>(`/alerts/${id}`);
   }
 
   // ============ SYSTEM ENDPOINTS ============
@@ -579,8 +593,7 @@ export class ExtrahopClient {
    * GET /extrahop - Get appliance info (for testing connection)
    */
   async getApplianceInfo(): Promise<any> {
-    const response = await this.client.get("/extrahop");
-    return response.data;
+    return this.rateLimitedGet<any>("/extrahop");
   }
 
   /**
