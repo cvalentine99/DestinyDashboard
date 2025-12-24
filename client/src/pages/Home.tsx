@@ -37,10 +37,10 @@ export default function Home() {
             <TricornLogo />
             <div>
               <h1 className="text-lg font-bold tracking-wider text-gradient-destiny">
-                SECOND SIGHT
+                VANGUARD OPS
               </h1>
               <p className="text-xs text-muted-foreground tracking-widest">
-                FORENSICS FOR EXTRAHOP
+                NETWORK FORENSICS FOR EXTRAHOP
               </p>
             </div>
           </div>
@@ -90,7 +90,7 @@ export default function Home() {
             </p>
             
             <h2 className="text-5xl md:text-7xl font-bold mb-6 tracking-tight">
-              <span className="text-gradient-destiny">SECOND SIGHT</span>
+              <span className="text-gradient-destiny">VANGUARD OPS</span>
             </h2>
             
             <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto leading-relaxed">
@@ -271,7 +271,7 @@ export default function Home() {
             <div className="flex items-center gap-2">
               <TricornLogo />
               <span className="text-sm text-muted-foreground">
-                Second Sight Forensics • Powered by ExtraHop
+                Vanguard Network Operations • Powered by ExtraHop
               </span>
             </div>
             <div className="flex items-center gap-6 text-sm text-muted-foreground">

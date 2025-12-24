@@ -59,3 +59,7 @@
 - [x] Auth logout tests
 - [x] TypeScript compilation check
 
+
+## Urgent Fix
+- [x] Remove all "Second Sight" branding from the application
+- [x] Rename to "Vanguard Ops" / "Vanguard Network Operations"
