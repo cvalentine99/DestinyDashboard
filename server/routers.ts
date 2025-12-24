@@ -1094,13 +1094,14 @@ const crucibleRouter = router({
 
   // ============ PCAP DOWNLOAD ============
 
-  // Download PCAP for a device during a time range
+  // Download PCAP for a device during a time range with optional BPF filter
   downloadPcap: protectedProcedure
     .input(z.object({
       deviceIp: z.string(),
       fromMs: z.number(),
       untilMs: z.number().optional(),
       limitBytes: z.number().optional().default(100000000), // 100MB default
+      bpfFilter: z.string().optional(), // Berkeley Packet Filter expression
     }))
     .mutation(async ({ ctx, input }) => {
       const config = await db.getExtrahopConfigByUser(ctx.user.id);
@@ -1115,7 +1116,8 @@ const crucibleRouter = router({
           input.deviceIp,
           input.fromMs,
           input.untilMs || 0,
-          input.limitBytes
+          input.limitBytes,
+          input.bpfFilter
         );
 
         // Convert ArrayBuffer to base64 for transport

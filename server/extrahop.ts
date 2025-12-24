@@ -509,14 +509,22 @@ export class ExtrahopClient {
   /**
    * Download PCAP for a specific device during a time range
    * Useful for capturing Crucible match traffic
+   * @param bpfFilter - Optional Berkeley Packet Filter expression for advanced filtering
    */
-  async downloadDevicePcap(deviceIp: string, fromMs: number, untilMs: number = 0, limitBytes: number = 100000000): Promise<ArrayBuffer> {
+  async downloadDevicePcap(
+    deviceIp: string, 
+    fromMs: number, 
+    untilMs: number = 0, 
+    limitBytes: number = 100000000,
+    bpfFilter?: string
+  ): Promise<ArrayBuffer> {
     return this.searchPackets({
       from: fromMs,
       until: untilMs,
       ip1: deviceIp,
-      limit_bytes: limitBytes, // 100MB default
+      limit_bytes: limitBytes,
       output: "pcap",
+      bpf: bpfFilter,
     });
   }
 

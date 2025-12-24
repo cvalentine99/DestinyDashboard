@@ -38,6 +38,8 @@ import { useState, useEffect, useMemo } from "react";
 import { toast } from "sonner";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Area, AreaChart } from "recharts";
 import LoreChatbot from "@/components/LoreChatbot";
+import GhostVoiceAlerts from "@/components/GhostVoiceAlerts";
+import BPFFilterBuilder from "@/components/BPFFilterBuilder";
 
 // Tricorn Logo Component
 function TricornLogo({ className = "h-8 w-8" }: { className?: string }) {
@@ -204,7 +206,7 @@ function PeerCard({ peer }: { peer: any }) {
   );
 }
 
-// Event timeline item
+// Event timeline item with nanosecond precision
 function EventItem({ event }: { event: any }) {
   const getSeverityColor = () => {
     switch (event.severity) {
@@ -227,17 +229,41 @@ function EventItem({ event }: { event: any }) {
     }
   };
 
-  const timestamp = new Date(Number(event.timestampNs) / 1000000);
+  // Format nanosecond timestamp with full precision for forensic analysis
+  const formatNsTimestamp = (ns: bigint | string | number): { time: string; precision: string } => {
+    const nsValue = typeof ns === 'bigint' ? ns : BigInt(ns);
+    const totalMs = Number(nsValue / BigInt(1_000_000));
+    const nanoRemainder = Number(nsValue % BigInt(1_000_000));
+    
+    const date = new Date(totalMs);
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    const seconds = date.getSeconds().toString().padStart(2, '0');
+    const milliseconds = date.getMilliseconds().toString().padStart(3, '0');
+    const micros = Math.floor(nanoRemainder / 1000).toString().padStart(3, '0');
+    const nanos = (nanoRemainder % 1000).toString().padStart(3, '0');
+    
+    return {
+      time: `${hours}:${minutes}:${seconds}`,
+      precision: `.${milliseconds}.${micros}.${nanos}`
+    };
+  };
+
+  const { time, precision } = formatNsTimestamp(event.timestampNs);
 
   return (
     <div className={`flex items-start gap-3 p-3 rounded-lg border-l-2 ${getSeverityColor()}`}>
       <div className="mt-0.5">{getEventIcon()}</div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium">{event.description}</p>
-        <p className="text-xs text-muted-foreground">
-          {timestamp.toLocaleTimeString()}
-          {event.latencyMs && ` • ${event.latencyMs}ms`}
-        </p>
+        <div className="flex items-center gap-2 text-xs">
+          <span className="font-mono text-muted-foreground">
+            {time}<span className="text-primary/60">{precision}</span>
+          </span>
+          {event.latencyMs && (
+            <span className="text-amber-400">• {event.latencyMs}ms</span>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -357,6 +383,7 @@ export default function Crucible() {
   const [selectedDevice, setSelectedDevice] = useState<any>(null); // ExtraHop device object
   const [activeMatchId, setActiveMatchId] = useState<number | null>(null);
   const [selectedGameMode, setSelectedGameMode] = useState("control");
+  const [activeBpfFilter, setActiveBpfFilter] = useState<string>("");
 
   // Queries - use real ExtraHop device metrics
   const { data: config } = trpc.extrahop.getConfig.useQuery(
@@ -554,6 +581,15 @@ export default function Crucible() {
             </p>
           </div>
           <div className="flex items-center gap-3">
+            <GhostVoiceAlerts
+              currentLatency={realtimeMetrics?.dataPoints?.[realtimeMetrics.dataPoints.length - 1]?.latencyMs || 0}
+              currentJitter={realtimeMetrics?.dataPoints?.[realtimeMetrics.dataPoints.length - 1]?.jitterMs || 0}
+              currentPacketLoss={realtimeMetrics?.dataPoints?.[realtimeMetrics.dataPoints.length - 1]?.packetLoss || 0}
+              connectionQuality={realtimeMetrics?.connectionQuality?.rating || "unknown"}
+              peerCount={realtimePeers?.peers?.length || 0}
+              isMatchActive={!!activeMatchId}
+              matchState={activeMatch?.matchState}
+            />
             <FindPS5Dialog onDeviceFound={(device) => setSelectedDevice(device)} />
           </div>
         </div>
@@ -879,42 +915,73 @@ export default function Crucible() {
               </Card>
             </div>
 
-            {/* PCAP Download Section */}
+            {/* PCAP Download Section with BPF Filter Builder */}
             {selectedDevice?.ipaddr4 && (
-              <Card className="bg-card/50 backdrop-blur border-border">
-                <CardHeader>
-                  <CardTitle className="text-sm flex items-center gap-2">
-                    <Zap className="h-4 w-4 text-amber-400" />
-                    Packet Capture (PCAP)
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center gap-4">
-                    <p className="text-sm text-muted-foreground flex-1">
-                      Download packet capture for post-game analysis. Captures all traffic to/from your PS5.
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card className="bg-card/50 backdrop-blur border-border">
+                  <CardHeader>
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <Zap className="h-4 w-4 text-amber-400" />
+                      Packet Capture (PCAP)
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <p className="text-sm text-muted-foreground">
+                      Download packet capture for post-game analysis. Use the BPF Filter Builder to customize what traffic to capture.
                     </p>
-                    <Button
-                      variant="outline"
-                      className="border-amber-400/50 text-amber-400 hover:bg-amber-400/10"
-                      onClick={() => {
-                        downloadPcapMutation.mutate({
-                          deviceIp: selectedDevice.ipaddr4,
-                          fromMs: Date.now() - 300000, // Last 5 minutes
-                          untilMs: Date.now(),
-                        });
-                      }}
-                      disabled={downloadPcapMutation.isPending}
-                    >
-                      {downloadPcapMutation.isPending ? (
-                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                      ) : (
+                    <div className="flex flex-col gap-2">
+                      <Button
+                        variant="outline"
+                        className="border-amber-400/50 text-amber-400 hover:bg-amber-400/10"
+                        onClick={() => {
+                          downloadPcapMutation.mutate({
+                            deviceIp: selectedDevice.ipaddr4,
+                            fromMs: Date.now() - 300000, // Last 5 minutes
+                            untilMs: Date.now(),
+                            bpfFilter: activeBpfFilter || undefined,
+                          });
+                        }}
+                        disabled={downloadPcapMutation.isPending}
+                      >
+                        {downloadPcapMutation.isPending ? (
+                          <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Zap className="h-4 w-4 mr-2" />
+                        )}
+                        Download Last 5 Min
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="border-primary/50 text-primary hover:bg-primary/10"
+                        onClick={() => {
+                          downloadPcapMutation.mutate({
+                            deviceIp: selectedDevice.ipaddr4,
+                            fromMs: Date.now() - 60000, // Last 1 minute
+                            untilMs: Date.now(),
+                            bpfFilter: activeBpfFilter || undefined,
+                          });
+                        }}
+                        disabled={downloadPcapMutation.isPending}
+                      >
                         <Zap className="h-4 w-4 mr-2" />
-                      )}
-                      Download Last 5 Min
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+                        Download Last 1 Min
+                      </Button>
+                    </div>
+                    {activeBpfFilter && (
+                      <div className="p-2 rounded bg-primary/10 border border-primary/30">
+                        <p className="text-xs text-muted-foreground mb-1">Active Filter:</p>
+                        <code className="text-xs font-mono text-primary">{activeBpfFilter}</code>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+                
+                <BPFFilterBuilder
+                  deviceIp={selectedDevice.ipaddr4}
+                  onFilterChange={(filter) => setActiveBpfFilter(filter)}
+                  initialFilter={activeBpfFilter}
+                />
+              </div>
             )}
           </TabsContent>
 

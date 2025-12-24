@@ -94,3 +94,24 @@
 - [x] Build PCAP capture UI with time range selection (last 5 min button)
 - [x] Add downloadPcap and downloadMatchPcap mutations
 - [x] Add download button to post-game match review
+
+## Ghost Voice Alerts
+- [x] Implement Ghost voice announcements for lag spikes during matches
+- [x] Add voice alerts for connection quality changes (Excellent → Fair, etc.)
+- [x] Create configurable alert thresholds (latency > 100ms, packet loss > 2%)
+- [x] Use Web Speech API with Destiny-themed phrases ("Guardian, connection degraded")
+- [x] Add mute/unmute toggle for voice alerts
+
+## Nanosecond Precision Timestamps
+- [x] Upgrade timeline event timestamps to nanosecond precision
+- [x] Update database schema for BigInt nanosecond storage (already had timestampNs)
+- [x] Implement high-resolution time formatting in UI (nanoseconds.ts utility)
+- [x] Add nanosecond precision to PCAP correlation
+- [x] Update match timeline display with ns-level accuracy (HH:MM:SS.ms.μs.ns)
+
+## BPF Filter Builder
+- [x] Create BPF filter builder UI component
+- [x] Add preset filters for Destiny 2 traffic (UDP 3074, STUN 3478-3480, Bungie API)
+- [x] Implement custom filter input with syntax validation
+- [x] Add filter preview showing expected traffic types
+- [x] Integrate BPF filters with PCAP download feature
