@@ -444,7 +444,7 @@ export type InsertAchievementDefinition = typeof achievementDefinitions.$inferIn
 // User Achievement Progress
 export const userAchievements = mysqlTable("user_achievements", {
   id: int("id").autoincrement().primaryKey(),
-  oderId: int("userId").notNull(),
+  userId: int("userId").notNull(),
   achievementId: varchar("achievementId", { length: 64 }).notNull(),
   currentValue: int("currentValue").default(0).notNull(),
   isCompleted: boolean("isCompleted").default(false).notNull(),
@@ -525,7 +525,7 @@ export type InsertUserTriumphStats = typeof userTriumphStats.$inferInsert;
 // Achievement Notification Queue (for showing popups)
 export const achievementNotifications = mysqlTable("achievement_notifications", {
   id: int("id").autoincrement().primaryKey(),
-  oderId: int("userId").notNull(),
+  userId: int("userId").notNull(),
   achievementId: varchar("achievementId", { length: 64 }).notNull(),
   shown: boolean("shown").default(false).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

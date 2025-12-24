@@ -11,6 +11,7 @@
  */
 
 import axios, { AxiosInstance } from 'axios';
+import { bungieRateLimiter } from './_core/rateLimiter';
 
 // Bungie API base URL
 const BUNGIE_API_BASE = 'https://www.bungie.net/Platform';
@@ -300,6 +301,9 @@ export interface ProcessedMatchData {
 
 /**
  * Bungie API Client
+ *
+ * All API calls are rate-limited to prevent hitting Bungie's rate limits.
+ * Current limit: 25 requests per second.
  */
 export class BungieClient {
   private client: AxiosInstance;
@@ -317,6 +321,26 @@ export class BungieClient {
   }
 
   /**
+   * Rate-limited GET request
+   */
+  private async rateLimitedGet<T>(url: string, config?: object): Promise<T> {
+    return bungieRateLimiter.execute(async () => {
+      const response = await this.client.get<T>(url, config);
+      return response.data;
+    });
+  }
+
+  /**
+   * Rate-limited POST request
+   */
+  private async rateLimitedPost<T>(url: string, data?: object): Promise<T> {
+    return bungieRateLimiter.execute(async () => {
+      const response = await this.client.post<T>(url, data);
+      return response.data;
+    });
+  }
+
+  /**
    * Search for a Destiny player by Bungie name (name#code format)
    */
   async searchPlayerByBungieName(
@@ -324,19 +348,19 @@ export class BungieClient {
     displayNameCode: number,
     membershipType: number = MembershipType.All
   ): Promise<UserInfoCard[]> {
-    const response = await this.client.post<BungieResponse<UserInfoCard[]>>(
+    const data = await this.rateLimitedPost<BungieResponse<UserInfoCard[]>>(
       `/Destiny2/SearchDestinyPlayerByBungieName/${membershipType}/`,
       {
         displayName,
         displayNameCode,
       }
     );
-    
-    if (response.data.ErrorCode !== 1) {
-      throw new Error(`Bungie API Error: ${response.data.Message}`);
+
+    if (data.ErrorCode !== 1) {
+      throw new Error(`Bungie API Error: ${data.Message}`);
     }
-    
-    return response.data.Response;
+
+    return data.Response;
   }
 
   /**
@@ -366,7 +390,7 @@ export class BungieClient {
     membershipId: string,
     components: number[] = [100, 200] // Profiles, Characters
   ): Promise<DestinyProfileResponse> {
-    const response = await this.client.get<BungieResponse<DestinyProfileResponse>>(
+    const data = await this.rateLimitedGet<BungieResponse<DestinyProfileResponse>>(
       `/Destiny2/${membershipType}/Profile/${membershipId}/`,
       {
         params: {
@@ -374,12 +398,12 @@ export class BungieClient {
         },
       }
     );
-    
-    if (response.data.ErrorCode !== 1) {
-      throw new Error(`Bungie API Error: ${response.data.Message}`);
+
+    if (data.ErrorCode !== 1) {
+      throw new Error(`Bungie API Error: ${data.Message}`);
     }
-    
-    return response.data.Response;
+
+    return data.Response;
   }
 
   /**
@@ -396,8 +420,8 @@ export class BungieClient {
     } = {}
   ): Promise<DestinyActivityHistoryResults> {
     const { mode = DestinyActivityModeType.AllPvP, count = 25, page = 0 } = options;
-    
-    const response = await this.client.get<BungieResponse<DestinyActivityHistoryResults>>(
+
+    const data = await this.rateLimitedGet<BungieResponse<DestinyActivityHistoryResults>>(
       `/Destiny2/${membershipType}/Account/${membershipId}/Character/${characterId}/Stats/Activities/`,
       {
         params: {
@@ -407,27 +431,27 @@ export class BungieClient {
         },
       }
     );
-    
-    if (response.data.ErrorCode !== 1) {
-      throw new Error(`Bungie API Error: ${response.data.Message}`);
+
+    if (data.ErrorCode !== 1) {
+      throw new Error(`Bungie API Error: ${data.Message}`);
     }
-    
-    return response.data.Response;
+
+    return data.Response;
   }
 
   /**
    * Get Post Game Carnage Report for a specific activity
    */
   async getPostGameCarnageReport(activityId: string): Promise<DestinyPostGameCarnageReportData> {
-    const response = await this.client.get<BungieResponse<DestinyPostGameCarnageReportData>>(
+    const data = await this.rateLimitedGet<BungieResponse<DestinyPostGameCarnageReportData>>(
       `/Destiny2/Stats/PostGameCarnageReport/${activityId}/`
     );
-    
-    if (response.data.ErrorCode !== 1) {
-      throw new Error(`Bungie API Error: ${response.data.Message}`);
+
+    if (data.ErrorCode !== 1) {
+      throw new Error(`Bungie API Error: ${data.Message}`);
     }
-    
-    return response.data.Response;
+
+    return data.Response;
   }
 
   /**

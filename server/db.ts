@@ -880,7 +880,7 @@ export async function getUserAchievements(userId: number): Promise<UserAchieveme
   if (!db) return [];
 
   return db.select().from(userAchievements)
-    .where(eq(userAchievements.oderId, userId));
+    .where(eq(userAchievements.userId, userId));
 }
 
 // Get or create achievement progress
@@ -893,14 +893,14 @@ export async function getOrCreateAchievementProgress(
 
   const existing = await db.select().from(userAchievements)
     .where(and(
-      eq(userAchievements.oderId, userId),
+      eq(userAchievements.userId, userId),
       eq(userAchievements.achievementId, achievementId)
     )).limit(1);
   
   if (existing.length > 0) return existing[0];
 
   await db.insert(userAchievements).values({
-    oderId: userId,
+    userId: userId,
     achievementId,
     currentValue: 0,
     isCompleted: false,
@@ -908,7 +908,7 @@ export async function getOrCreateAchievementProgress(
 
   const created = await db.select().from(userAchievements)
     .where(and(
-      eq(userAchievements.oderId, userId),
+      eq(userAchievements.userId, userId),
       eq(userAchievements.achievementId, achievementId)
     )).limit(1);
   return created[0];
@@ -938,7 +938,7 @@ export async function updateAchievementProgress(
   await db.update(userAchievements)
     .set(updateData)
     .where(and(
-      eq(userAchievements.oderId, userId),
+      eq(userAchievements.userId, userId),
       eq(userAchievements.achievementId, achievementId)
     ));
 }
@@ -959,7 +959,7 @@ export async function completeAchievement(
       completedAt: new Date(),
     })
     .where(and(
-      eq(userAchievements.oderId, userId),
+      eq(userAchievements.userId, userId),
       eq(userAchievements.achievementId, achievementId)
     ));
 
@@ -972,7 +972,7 @@ export async function completeAchievement(
 
   // Create notification
   await db.insert(achievementNotifications).values({
-    oderId: userId,
+    userId: userId,
     achievementId,
     shown: false,
   });
@@ -987,7 +987,7 @@ export async function getPendingAchievementNotifications(
 
   return db.select().from(achievementNotifications)
     .where(and(
-      eq(achievementNotifications.oderId, userId),
+      eq(achievementNotifications.userId, userId),
       eq(achievementNotifications.shown, false)
     ))
     .orderBy(achievementNotifications.createdAt);
@@ -1011,7 +1011,7 @@ export async function getCompletedAchievementsCount(userId: number): Promise<num
   const result = await db.select({ count: sql<number>`count(*)` })
     .from(userAchievements)
     .where(and(
-      eq(userAchievements.oderId, userId),
+      eq(userAchievements.userId, userId),
       eq(userAchievements.isCompleted, true)
     ));
   
