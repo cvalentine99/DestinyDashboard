@@ -43,10 +43,15 @@ interface TopologyNode {
 }
 
 interface TopologyEdge {
-  source: number;
-  target: number;
-  protocol: string;
+  from: number;
+  to: number;
   weight: number;
+  protocols?: string[];
+  appearances?: number;
+  // Mapped properties for rendering
+  source?: number;
+  target?: number;
+  protocol?: string;
 }
 
 export default function Topology() {
@@ -124,9 +129,9 @@ export default function Topology() {
         // Connect to center or nearby nodes
         if (Math.random() > 0.3) {
           demoEdges.push({
-            source: 0,
-            target: i,
-            protocol: ["HTTP", "HTTPS", "SSH", "DNS"][Math.floor(Math.random() * 4)],
+            from: 0,
+            to: i,
+            protocols: [["HTTP", "HTTPS", "SSH", "DNS"][Math.floor(Math.random() * 4)]],
             weight: Math.random() * 100,
           });
         }
@@ -134,9 +139,9 @@ export default function Topology() {
         // Random connections between nodes
         if (i > 1 && Math.random() > 0.6) {
           demoEdges.push({
-            source: Math.floor(Math.random() * (i - 1)) + 1,
-            target: i,
-            protocol: ["HTTP", "HTTPS", "SSH", "DNS"][Math.floor(Math.random() * 4)],
+            from: Math.floor(Math.random() * (i - 1)) + 1,
+            to: i,
+            protocols: [["HTTP", "HTTPS", "SSH", "DNS"][Math.floor(Math.random() * 4)]],
             weight: Math.random() * 50,
           });
         }
@@ -255,8 +260,11 @@ export default function Topology() {
 
     // Draw edges
     for (const edge of edges) {
-      const source = nodes.find(n => n.id === edge.source);
-      const target = nodes.find(n => n.id === edge.target);
+      // Handle both API format (from/to) and legacy format (source/target)
+      const sourceId = edge.from ?? edge.source;
+      const targetId = edge.to ?? edge.target;
+      const source = nodes.find(n => n.id === sourceId);
+      const target = nodes.find(n => n.id === targetId);
       if (!source || !target) continue;
 
       const protocolColors: Record<string, string> = {
@@ -266,7 +274,8 @@ export default function Topology() {
         DNS: "oklch(0.75 0.15 70)",
       };
 
-      ctx.strokeStyle = protocolColors[edge.protocol] || "oklch(0.30 0.03 250)";
+      const protocol = edge.protocols?.[0] || edge.protocol || "unknown";
+      ctx.strokeStyle = protocolColors[protocol] || "oklch(0.30 0.03 250)";
       ctx.lineWidth = Math.max(1, edge.weight / 20);
       ctx.globalAlpha = 0.5;
       

@@ -1,23 +1,141 @@
+// ExtraHop REST API Client - Based on actual API spec v1
+// Endpoints: /devices/search, /metrics, /records/search, /activitymaps/query, /detections/search
+
 import axios, { AxiosInstance } from "axios";
 
-// ExtraHop API client for network monitoring
 export interface ExtrahopCredentials {
   apiUrl: string;
   apiKey: string;
 }
 
+export interface DeviceSearchFilter {
+  field?: string;
+  operator: string;
+  operand?: string | number | object | string[];
+  rules?: DeviceSearchFilter[];
+}
+
+export interface DeviceSearchParams {
+  filter?: DeviceSearchFilter;
+  limit?: number;
+  offset?: number;
+  active_from?: number | string;
+  active_until?: number | string;
+  result_fields?: string[];
+}
+
+export interface MetricSpec {
+  name: string;
+  key1?: string;
+  key2?: string;
+  calc_type?: "mean" | "percentiles";
+  percentiles?: number[];
+}
+
+export interface MetricQuery {
+  cycle: "auto" | "1sec" | "30sec" | "5min" | "1hr" | "24hr";
+  from: number | string;
+  until: number | string;
+  metric_category: string;
+  metric_specs: MetricSpec[];
+  object_ids: number[];
+  object_type: "network" | "device" | "application" | "vlan" | "device_group" | "system";
+}
+
+export interface RecordFilter {
+  field?: string;
+  operator: string;
+  operand?: string | number | object;
+  rules?: RecordFilter[];
+}
+
+export interface RecordQuery {
+  from: number | string;
+  until?: number | string;
+  limit?: number;
+  offset?: number;
+  filter?: RecordFilter;
+  sort?: { field: string; direction: "asc" | "desc" }[];
+  types?: string[];
+  context_ttl?: number;
+}
+
+export interface TopologySource {
+  object_id: number;
+  object_type: "all_devices" | "device_group" | "device";
+}
+
+export interface TopologyRelationship {
+  protocol?: string;
+  role?: "client" | "server" | "any";
+}
+
+export interface TopologyStep {
+  peer_in?: TopologySource[];
+  peer_not_in?: TopologySource[];
+  relationships?: TopologyRelationship[];
+}
+
+export interface TopologyWalk {
+  origins: TopologySource[];
+  steps: TopologyStep[];
+}
+
+export interface TopologyQuery {
+  from: number | string;
+  until?: number | string;
+  walks: TopologyWalk[];
+  edge_annotations?: ("protocols" | "appearances")[];
+  weighting?: "bytes" | "connections" | "turns";
+}
+
+export interface DetectionSearchFilter {
+  assignee?: string[];
+  categories?: string[];
+  recommended?: boolean;
+  resolution?: ("action_taken" | "no_action_taken")[];
+  risk_score_min?: number;
+  status?: ("new" | "in_progress" | "closed" | "acknowledged")[];
+  ticket_id?: string[];
+  types?: string[];
+}
+
+export interface DetectionSearchParams {
+  filter?: DetectionSearchFilter;
+  from?: number;
+  until?: number;
+  limit?: number;
+  offset?: number;
+  sort?: { field: string; direction: "asc" | "desc" }[];
+  update_time?: number;
+}
+
+// ExtraHop Device from API response
 export interface Device {
   id: number;
-  display_name: string;
-  ipaddr4: string;
-  macaddr: string;
-  device_class: string;
-  role: string;
-  vendor: string;
-  is_l3: boolean;
-  activity: string[];
-  analysis_level: number;
-  mod_time: number;
+  extrahop_id?: string;
+  display_name?: string;
+  default_name?: string;
+  custom_name?: string;
+  description?: string;
+  ipaddr4?: string;
+  ipaddr6?: string;
+  macaddr?: string;
+  vendor?: string;
+  device_class?: string;
+  role?: string;
+  auto_role?: string;
+  analysis_level?: number;
+  analysis?: string;
+  is_l3?: boolean;
+  vlanid?: number;
+  activity?: string[];
+  last_seen_time?: number;
+  discover_time?: number;
+  mod_time?: number;
+  on_watchlist?: boolean;
+  critical?: boolean;
+  model?: string;
 }
 
 export interface Alert {
@@ -49,37 +167,46 @@ export interface Detection {
 }
 
 export interface MetricResult {
+  cycle: string;
+  from: number;
+  until: number;
   stats: {
+    oid: number;
     time: number;
-    values: { key: { str?: string; addr?: string }; value: number }[];
+    duration: number;
+    values: number[][];
   }[];
 }
 
 export interface TopologyNode {
   id: number;
   object_type: string;
-  name: string;
+  name?: string;
   ipaddr?: string;
+  macaddr?: string;
 }
 
 export interface TopologyEdge {
-  source: number;
-  target: number;
-  protocol: string;
+  from: number;
+  to: number;
   weight: number;
+  protocols?: string[];
+  appearances?: number;
 }
 
 export interface TopologyResponse {
-  nodes: TopologyNode[];
   edges: TopologyEdge[];
+  nodes: TopologyNode[];
 }
 
 export class ExtrahopClient {
   private client: AxiosInstance;
+  private baseUrl: string;
 
   constructor(credentials: ExtrahopCredentials) {
+    this.baseUrl = credentials.apiUrl.replace(/\/$/, "");
     this.client = axios.create({
-      baseURL: `${credentials.apiUrl}/api/v1`,
+      baseURL: `${this.baseUrl}/api/v1`,
       headers: {
         Authorization: `ExtraHop apikey=${credentials.apiKey}`,
         "Content-Type": "application/json",
@@ -89,148 +216,313 @@ export class ExtrahopClient {
     });
   }
 
-  // Get appliance info
-  async getApplianceInfo() {
-    const response = await this.client.get("/extrahop");
-    return response.data;
-  }
+  // ============ DEVICE ENDPOINTS ============
 
-  // Get all devices
-  async getDevices(params?: {
-    limit?: number;
-    offset?: number;
-    search_type?: string;
-    value?: string;
-  }): Promise<Device[]> {
+  /**
+   * GET /devices - Retrieve all devices
+   */
+  async getDevices(params?: { limit?: number; offset?: number; search_type?: string; value?: string }): Promise<Device[]> {
     const response = await this.client.get("/devices", { params });
     return response.data;
   }
 
-  // Get device by ID
+  /**
+   * POST /devices/search - Search for devices with filters
+   * This is the primary way to find devices like the PS5
+   */
+  async searchDevices(params: DeviceSearchParams): Promise<Device[]> {
+    const response = await this.client.post("/devices/search", params);
+    return response.data;
+  }
+
+  /**
+   * GET /devices/{id} - Get a specific device by ID
+   */
   async getDevice(id: number): Promise<Device> {
     const response = await this.client.get(`/devices/${id}`);
     return response.data;
   }
 
-  // Search devices
-  async searchDevices(filter: {
-    field: string;
-    operator: string;
-    operand: string | number;
-  }[]): Promise<Device[]> {
-    const response = await this.client.post("/devices/search", {
-      filter: { rules: filter, operator: "and" },
+  /**
+   * GET /devices/{id}/activity - Get device activity (protocols used)
+   */
+  async getDeviceActivity(deviceId: number): Promise<{ from_time: number; until_time: number; stat_name: string }[]> {
+    const response = await this.client.get(`/devices/${deviceId}/activity`);
+    return response.data;
+  }
+
+  /**
+   * GET /devices/{id}/ipaddrs - Get IP addresses for a device
+   */
+  async getDeviceIpAddresses(deviceId: number): Promise<{ ipaddr: string; from: number; until: number }[]> {
+    const response = await this.client.get(`/devices/${deviceId}/ipaddrs`);
+    return response.data;
+  }
+
+  /**
+   * Find PS5 device by searching for Sony vendor
+   * Uses /devices/search with vendor filter
+   */
+  async findPS5Device(): Promise<Device | null> {
+    const devices = await this.searchDevices({
+      filter: {
+        operator: "or",
+        rules: [
+          { field: "vendor", operator: "~", operand: "Sony" },
+          { field: "name", operator: "~", operand: "PlayStation" },
+          { field: "name", operator: "~", operand: "PS5" },
+        ],
+      },
+      result_fields: ["id", "display_name", "default_name", "ipaddr4", "macaddr", "vendor", "device_class", "last_seen_time", "activity", "analysis_level"],
     });
+    
+    return devices.length > 0 ? devices[0] : null;
+  }
+
+  /**
+   * Find device by name pattern (e.g., "Sony Interactive Entertainment BCD278")
+   */
+  async findDeviceByName(namePattern: string): Promise<Device | null> {
+    const devices = await this.searchDevices({
+      filter: {
+        field: "name",
+        operator: "~",
+        operand: namePattern,
+      },
+      result_fields: ["id", "display_name", "default_name", "ipaddr4", "macaddr", "vendor", "device_class", "last_seen_time", "activity", "analysis_level"],
+      limit: 1,
+    });
+    
+    return devices.length > 0 ? devices[0] : null;
+  }
+
+  // ============ METRICS ENDPOINTS ============
+
+  /**
+   * POST /metrics - Query metrics for devices
+   * This is the core endpoint for getting network performance data
+   */
+  async queryMetrics(params: MetricQuery): Promise<MetricResult> {
+    const response = await this.client.post("/metrics", params);
     return response.data;
   }
 
-  // Get all alerts
-  async getAlerts(): Promise<Alert[]> {
-    const response = await this.client.get("/alerts");
+  /**
+   * Get network metrics for a device (bytes, packets, etc.)
+   */
+  async getDeviceNetworkMetrics(deviceId: number, fromMs: number = -300000, untilMs: number = 0): Promise<MetricResult> {
+    return this.queryMetrics({
+      cycle: "30sec",
+      from: fromMs,
+      until: untilMs,
+      metric_category: "net",
+      object_type: "device",
+      object_ids: [deviceId],
+      metric_specs: [
+        { name: "bytes_in" },
+        { name: "bytes_out" },
+        { name: "pkts_in" },
+        { name: "pkts_out" },
+        { name: "rto_in" },
+        { name: "rto_out" },
+      ],
+    });
+  }
+
+  /**
+   * Get TCP metrics for a device (RTT, retransmits, etc.)
+   */
+  async getDeviceTcpMetrics(deviceId: number, fromMs: number = -300000, untilMs: number = 0): Promise<MetricResult> {
+    return this.queryMetrics({
+      cycle: "30sec",
+      from: fromMs,
+      until: untilMs,
+      metric_category: "tcp",
+      object_type: "device",
+      object_ids: [deviceId],
+      metric_specs: [
+        { name: "rtt" },
+        { name: "rtt", calc_type: "percentiles", percentiles: [50, 95, 99] },
+        { name: "retrans_out" },
+        { name: "zwin_in" },
+        { name: "zwin_out" },
+      ],
+    });
+  }
+
+  /**
+   * Get 1-second granularity metrics for real-time monitoring
+   */
+  async getDeviceRealtimeMetrics(deviceId: number): Promise<MetricResult> {
+    return this.queryMetrics({
+      cycle: "1sec",
+      from: -60000, // Last 60 seconds
+      until: 0,
+      metric_category: "net",
+      object_type: "device",
+      object_ids: [deviceId],
+      metric_specs: [
+        { name: "bytes_in" },
+        { name: "bytes_out" },
+        { name: "pkts_in" },
+        { name: "pkts_out" },
+      ],
+    });
+  }
+
+  // ============ RECORDS ENDPOINTS ============
+
+  /**
+   * POST /records/search - Search flow records
+   * Use this for detailed connection/flow data
+   */
+  async searchRecords(params: RecordQuery): Promise<any> {
+    const response = await this.client.post("/records/search", params);
     return response.data;
   }
 
-  // Get alert by ID
-  async getAlert(id: number): Promise<Alert> {
-    const response = await this.client.get(`/alerts/${id}`);
+  /**
+   * Get flow records for a specific device (connections to/from)
+   */
+  async getDeviceFlowRecords(deviceId: number, fromMs: number = -300000, limit: number = 100): Promise<any> {
+    return this.searchRecords({
+      from: fromMs,
+      until: 0,
+      limit,
+      filter: {
+        operator: "or",
+        rules: [
+          { field: "clientId", operator: "=", operand: deviceId },
+          { field: "serverId", operator: "=", operand: deviceId },
+        ],
+      },
+      types: ["~flow"],
+      sort: [{ field: "timestamp", direction: "desc" }],
+    });
+  }
+
+  /**
+   * Get peer connections for a device (who is it talking to)
+   */
+  async getDevicePeerRecords(deviceId: number, fromMs: number = -60000): Promise<any> {
+    return this.searchRecords({
+      from: fromMs,
+      until: 0,
+      limit: 500,
+      filter: {
+        operator: "or",
+        rules: [
+          { field: "clientId", operator: "=", operand: deviceId },
+          { field: "serverId", operator: "=", operand: deviceId },
+        ],
+      },
+      types: ["~flow"],
+    });
+  }
+
+  // ============ ACTIVITY MAPS / TOPOLOGY ENDPOINTS ============
+
+  /**
+   * POST /activitymaps/query - Query network topology
+   * Shows device relationships and communication patterns
+   */
+  async queryTopology(params: TopologyQuery): Promise<TopologyResponse> {
+    const response = await this.client.post("/activitymaps/query", params);
     return response.data;
   }
 
-  // Get detections
-  async getDetections(params?: {
-    from?: number;
-    until?: number;
-    limit?: number;
-    offset?: number;
-    filter?: object;
-  }): Promise<{ detections: Detection[] }> {
-    const response = await this.client.get("/detections", { params });
+  /**
+   * Get peer topology for a device
+   */
+  async getDeviceTopology(deviceId: number, fromMs: number = -300000): Promise<TopologyResponse> {
+    return this.queryTopology({
+      from: fromMs,
+      until: 0,
+      edge_annotations: ["protocols", "appearances"],
+      weighting: "bytes",
+      walks: [{
+        origins: [{ object_type: "device", object_id: deviceId }],
+        steps: [{
+          relationships: [{ role: "any" }],
+        }],
+      }],
+    });
+  }
+
+  // ============ DETECTIONS ENDPOINTS ============
+
+  /**
+   * POST /detections/search - Search for security detections
+   */
+  async searchDetections(params: DetectionSearchParams): Promise<{ detections: Detection[] }> {
+    const response = await this.client.post("/detections/search", params);
     return response.data;
   }
 
-  // Get detection by ID
+  /**
+   * GET /detections/{id} - Get a specific detection
+   */
   async getDetection(id: number): Promise<Detection> {
     const response = await this.client.get(`/detections/${id}`);
     return response.data;
   }
 
-  // Query metrics
-  async queryMetrics(params: {
-    cycle: "auto" | "1sec" | "30sec" | "5min" | "1hr" | "24hr";
-    from: number;
-    until?: number;
-    metric_category: string;
-    metric_specs: { name: string; key1?: string; key2?: string }[];
-    object_type: string;
-    object_ids?: number[];
-  }): Promise<MetricResult> {
-    const response = await this.client.post("/metrics", params);
+  /**
+   * Get recent detections for monitoring
+   */
+  async getRecentDetections(fromMs: number = -3600000, limit: number = 50): Promise<{ detections: Detection[] }> {
+    return this.searchDetections({
+      from: Date.now() + fromMs,
+      limit,
+      sort: [{ field: "update_time", direction: "desc" }],
+    });
+  }
+
+  // ============ ALERTS ENDPOINTS ============
+
+  /**
+   * GET /alerts - Get all alerts
+   */
+  async getAlerts(): Promise<Alert[]> {
+    const response = await this.client.get("/alerts");
     return response.data;
   }
 
-  // Get activity maps
-  async getActivityMaps() {
-    const response = await this.client.get("/activitymaps");
+  /**
+   * GET /alerts/{id} - Get alert by ID
+   */
+  async getAlert(id: number): Promise<Alert> {
+    const response = await this.client.get(`/alerts/${id}`);
     return response.data;
   }
 
-  // Query topology
-  async queryTopology(params: {
-    from: number;
-    until?: number;
-    walks: {
-      origins: { object_type: string; object_id: number }[];
-      steps: {
-        relationships?: { protocol?: string; role?: string }[];
-      }[];
-    }[];
-    weighting?: "bytes" | "connections" | "turns";
-    edge_annotations?: string[];
-  }): Promise<TopologyResponse> {
-    const response = await this.client.post("/activitymaps/query", params);
+  // ============ SYSTEM ENDPOINTS ============
+
+  /**
+   * GET /extrahop - Get appliance info (for testing connection)
+   */
+  async getApplianceInfo(): Promise<any> {
+    const response = await this.client.get("/extrahop");
     return response.data;
   }
 
-  // Get networks
-  async getNetworks() {
-    const response = await this.client.get("/networks");
-    return response.data;
-  }
-
-  // Get device groups
-  async getDeviceGroups() {
-    const response = await this.client.get("/devicegroups");
-    return response.data;
-  }
-
-  // Get watchlist devices
-  async getWatchlistDevices(): Promise<Device[]> {
-    const response = await this.client.get("/watchlist/devices");
-    return response.data;
-  }
-
-  // Get tags
-  async getTags() {
-    const response = await this.client.get("/tags");
-    return response.data;
-  }
-
-  // Get software versions
-  async getSoftware() {
-    const response = await this.client.get("/software");
-    return response.data;
-  }
-
-  // Get records (packet search)
-  async searchRecords(params: {
-    from: number;
-    until?: number;
-    types?: string[];
-    filter?: object;
-    limit?: number;
-  }) {
-    const response = await this.client.post("/records/search", params);
-    return response.data;
+  /**
+   * Test API connection
+   */
+  async testConnection(): Promise<{ success: boolean; message: string; appliance?: any }> {
+    try {
+      const info = await this.getApplianceInfo();
+      return {
+        success: true,
+        message: "Connected to ExtraHop appliance",
+        appliance: info,
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: error.response?.data?.error_message || error.message || "Connection failed",
+      };
+    }
   }
 }
 
@@ -238,14 +530,18 @@ export class ExtrahopClient {
 export const destinyTerminology = {
   // Device types -> Guardian classes
   deviceClass: {
-    server: "Titan", // Strong, defensive
-    client: "Hunter", // Agile, numerous
-    gateway: "Warlock", // Mystical, routing
+    server: "Titan",
+    client: "Hunter",
+    gateway: "Warlock",
     firewall: "Ward of Dawn",
     loadbalancer: "Well of Radiance",
     database: "Cryptarch",
     dns: "Ghost",
     proxy: "Shade",
+    gaming: "Guardian Console",
+    pc: "Tower Terminal",
+    mobile: "Ghost Shell",
+    iot: "Servitor",
   },
   // Alert severities -> Threat levels
   severity: {
@@ -258,11 +554,17 @@ export const destinyTerminology = {
   // Metrics -> Power levels
   metrics: {
     bytes: "Light Energy",
+    bytes_in: "Light Received",
+    bytes_out: "Light Transmitted",
     connections: "Fireteam Links",
     latency: "Warp Speed",
+    rtt: "Neural Delay",
     throughput: "Glimmer Flow",
     packets: "Engrams",
+    pkts_in: "Engrams Received",
+    pkts_out: "Engrams Sent",
     errors: "Corrupted Data",
+    retrans: "Ghost Revives",
   },
   // Protocols -> Abilities
   protocols: {
@@ -276,6 +578,9 @@ export const destinyTerminology = {
     SMTP: "Nova Bomb",
     LDAP: "Daybreak",
     SQL: "Blade Barrage",
+    SSL: "Void Shield",
+    UDP: "Arc Bolt",
+    TCP: "Solar Flare",
   },
   // Status -> Guardian status
   status: {
@@ -287,24 +592,30 @@ export const destinyTerminology = {
   },
 };
 
-// Convert ExtraHop data to Destiny-themed display
+// Convert ExtraHop device to Destiny-themed display
 export function toDestinyDevice(device: Device) {
   const classMap = destinyTerminology.deviceClass;
-  const guardianClass = classMap[device.device_class as keyof typeof classMap] || "Unknown Guardian";
+  const deviceClass = device.device_class || "unknown";
+  const guardianClass = classMap[deviceClass as keyof typeof classMap] || "Unknown Guardian";
+  
+  // Calculate "power level" from analysis_level and activity
+  const activityScore = (device.activity?.length || 0) * 10;
+  const analysisScore = (device.analysis_level || 0) * 100;
+  const powerLevel = 1800 + activityScore + analysisScore;
   
   return {
     id: device.id,
-    name: device.display_name || `Guardian-${device.id}`,
+    name: device.display_name || device.default_name || `Guardian-${device.id}`,
     guardianClass,
-    lightLevel: Math.floor(Math.random() * 100) + 1800, // Simulated power level
+    lightLevel: Math.min(powerLevel, 2000),
     ipAddress: device.ipaddr4,
     macAddress: device.macaddr,
     vendor: device.vendor,
-    status: device.analysis_level > 0 ? "active" : "idle",
-    destinyStatus: device.analysis_level > 0 
+    status: (device.analysis_level || 0) > 0 ? "active" : "idle",
+    destinyStatus: (device.analysis_level || 0) > 0 
       ? destinyTerminology.status.active 
       : destinyTerminology.status.idle,
-    lastSeen: new Date(device.mod_time).toISOString(),
+    lastSeen: device.last_seen_time ? new Date(device.last_seen_time).toISOString() : null,
     activities: device.activity || [],
   };
 }
@@ -343,15 +654,20 @@ export function toDestinyMetric(metricName: string, value: number) {
 }
 
 function formatMetricValue(metricName: string, value: number): string {
-  if (metricName === "bytes") {
+  if (metricName.includes("bytes")) {
     if (value >= 1e12) return `${(value / 1e12).toFixed(2)} TB`;
     if (value >= 1e9) return `${(value / 1e9).toFixed(2)} GB`;
     if (value >= 1e6) return `${(value / 1e6).toFixed(2)} MB`;
     if (value >= 1e3) return `${(value / 1e3).toFixed(2)} KB`;
     return `${value} B`;
   }
-  if (metricName === "latency") {
+  if (metricName.includes("latency") || metricName === "rtt") {
     return `${value.toFixed(2)} ms`;
   }
   return value.toLocaleString();
+}
+
+// Helper to create client from stored config
+export function createExtrahopClient(apiUrl: string, apiKey: string): ExtrahopClient {
+  return new ExtrahopClient({ apiUrl, apiKey });
 }

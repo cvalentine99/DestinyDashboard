@@ -76,3 +76,12 @@
 - [x] Post-game match review with network events overlay
 - [x] Lag spike detection and alerting
 - [x] Crucible Operations Center dashboard UI
+
+## Critical Fix - Use Real ExtraHop API
+- [x] Remove fake device registration - ExtraHop discovers devices automatically
+- [x] Rewrite extrahop.ts to use actual API spec endpoints (/devices/search, /metrics, /records/search, /activitymaps/query, /detections/search)
+- [x] Update Crucible page to search for PS5 by vendor "Sony Interactive Entertainment" 
+- [x] Use /metrics endpoint with proper metric_category, metric_specs, object_ids
+- [x] Use /records/search for flow records and connection data
+- [x] Use /activitymaps/query for peer topology
+- [x] Remove all simulated/fake data generation

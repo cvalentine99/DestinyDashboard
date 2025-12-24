@@ -243,86 +243,108 @@ function EventItem({ event }: { event: any }) {
   );
 }
 
-// Device registration dialog
-function RegisterDeviceDialog({ onRegister }: { onRegister: () => void }) {
-  const [deviceName, setDeviceName] = useState("Sony Interactive Entertainment BCD278");
-  const [ipAddress, setIpAddress] = useState("");
-  const [macAddress, setMacAddress] = useState("");
+// Find PS5 Dialog - searches ExtraHop for Sony devices
+function FindPS5Dialog({ onDeviceFound }: { onDeviceFound: (device: any) => void }) {
   const [open, setOpen] = useState(false);
+  const [searchPattern, setSearchPattern] = useState("Sony");
 
   const { data: config } = trpc.extrahop.getConfig.useQuery();
-  const registerMutation = trpc.crucible.registerDevice.useMutation({
-    onSuccess: () => {
-      toast.success("PS5 registered for Crucible monitoring");
-      setOpen(false);
-      onRegister();
-    },
-    onError: (error) => {
-      toast.error(`Failed to register device: ${error.message}`);
-    },
-  });
+  
+  // Search for PS5 using ExtraHop /devices/search API
+  const { data: foundDevices, isLoading: searching, refetch: searchDevices } = trpc.extrahop.searchDevices.useQuery(
+    { namePattern: searchPattern },
+    { enabled: false } // Manual trigger only
+  );
 
-  const handleRegister = () => {
-    if (!config?.id) {
-      toast.error("Please configure ExtraHop connection first");
+  const handleSearch = () => {
+    if (!config) {
+      toast.error("Please configure ExtraHop connection first in Settings");
       return;
     }
-    registerMutation.mutate({
-      configId: config.id,
-      deviceName,
-      ipAddress: ipAddress || undefined,
-      macAddress: macAddress || undefined,
-      platform: "PS5",
-    });
+    searchDevices();
+  };
+
+  const handleSelectDevice = (device: any) => {
+    onDeviceFound(device);
+    setOpen(false);
+    toast.success(`PS5 found: ${device.display_name || device.default_name}`);
   };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button className="destiny-btn">
-          <Plus className="h-4 w-4 mr-2" />
-          Register PS5
+          <Monitor className="h-4 w-4 mr-2" />
+          Find PS5
         </Button>
       </DialogTrigger>
-      <DialogContent className="bg-card border-border">
+      <DialogContent className="bg-card border-border max-w-lg">
         <DialogHeader>
-          <DialogTitle className="text-gradient-destiny">Register PlayStation 5</DialogTitle>
+          <DialogTitle className="text-gradient-destiny">Find PlayStation 5 on Network</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-4">
-          <div className="space-y-2">
-            <Label>Device Name</Label>
+          <p className="text-sm text-muted-foreground">
+            Search ExtraHop for your PS5 using the /devices/search API. 
+            The device will be discovered automatically by ExtraHop.
+          </p>
+          <div className="flex gap-2">
             <Input 
-              value={deviceName}
-              onChange={(e) => setDeviceName(e.target.value)}
-              placeholder="Sony Interactive Entertainment BCD278"
-              className="bg-background"
+              value={searchPattern}
+              onChange={(e) => setSearchPattern(e.target.value)}
+              placeholder="Sony, PlayStation, PS5..."
+              className="bg-background flex-1"
             />
+            <Button 
+              onClick={handleSearch} 
+              className="destiny-btn"
+              disabled={searching || !config}
+            >
+              {searching ? <RefreshCw className="h-4 w-4 animate-spin" /> : "Search"}
+            </Button>
           </div>
-          <div className="space-y-2">
-            <Label>IP Address (optional)</Label>
-            <Input 
-              value={ipAddress}
-              onChange={(e) => setIpAddress(e.target.value)}
-              placeholder="192.168.1.100"
-              className="bg-background"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>MAC Address (optional)</Label>
-            <Input 
-              value={macAddress}
-              onChange={(e) => setMacAddress(e.target.value)}
-              placeholder="00:00:00:00:00:00"
-              className="bg-background"
-            />
-          </div>
-          <Button 
-            onClick={handleRegister} 
-            className="w-full destiny-btn"
-            disabled={registerMutation.isPending}
-          >
-            {registerMutation.isPending ? "Registering..." : "Register Device"}
-          </Button>
+          
+          {foundDevices && foundDevices.length > 0 && (
+            <div className="space-y-2">
+              <Label>Found Devices ({foundDevices.length})</Label>
+              <ScrollArea className="h-48 rounded border border-border">
+                <div className="p-2 space-y-2">
+                  {foundDevices.map((device: any) => (
+                    <div 
+                      key={device.id}
+                      className="p-3 rounded bg-background hover:bg-primary/10 cursor-pointer transition-colors border border-border"
+                      onClick={() => handleSelectDevice(device)}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium">{device.display_name || device.default_name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {device.ipaddr4} • {device.macaddr}
+                          </p>
+                        </div>
+                        <Badge variant="outline" className="text-primary border-primary">
+                          {device.vendor || "Unknown"}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </div>
+          )}
+          
+          {foundDevices && foundDevices.length === 0 && (
+            <p className="text-sm text-muted-foreground text-center py-4">
+              No devices found matching "{searchPattern}". Try a different search term.
+            </p>
+          )}
+          
+          {!config && (
+            <div className="p-3 rounded bg-destructive/10 border border-destructive/30">
+              <p className="text-sm text-destructive">
+                ExtraHop not configured. Go to Settings to connect your ExtraHop appliance.
+              </p>
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>
@@ -332,12 +354,12 @@ function RegisterDeviceDialog({ onRegister }: { onRegister: () => void }) {
 // Main Crucible page
 export default function Crucible() {
   const { user, isAuthenticated } = useAuth();
-  const [selectedDevice, setSelectedDevice] = useState<number | null>(null);
+  const [selectedDevice, setSelectedDevice] = useState<any>(null); // ExtraHop device object
   const [activeMatchId, setActiveMatchId] = useState<number | null>(null);
   const [selectedGameMode, setSelectedGameMode] = useState("control");
 
-  // Queries
-  const { data: devices, refetch: refetchDevices } = trpc.crucible.getDevices.useQuery(
+  // Queries - use real ExtraHop device metrics
+  const { data: config } = trpc.extrahop.getConfig.useQuery(
     undefined,
     { enabled: isAuthenticated }
   );
@@ -384,20 +406,15 @@ export default function Crucible() {
     }
   }, [activeMatch]);
 
-  // Auto-select first device
-  useEffect(() => {
-    if (devices?.length && !selectedDevice) {
-      setSelectedDevice(devices[0].id);
-    }
-  }, [devices, selectedDevice]);
+  // Device is now set via FindPS5Dialog
 
   const handleStartMatch = () => {
     if (!selectedDevice) {
-      toast.error("Please select a device first");
+      toast.error("Please find your PS5 first");
       return;
     }
     startMatchMutation.mutate({
-      deviceId: selectedDevice,
+      deviceId: selectedDevice.id, // ExtraHop device ID
       gameMode: selectedGameMode,
     });
   };
@@ -469,7 +486,7 @@ export default function Crucible() {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <RegisterDeviceDialog onRegister={refetchDevices} />
+            <FindPS5Dialog onDeviceFound={(device) => setSelectedDevice(device)} />
           </div>
         </div>
 
@@ -484,24 +501,30 @@ export default function Crucible() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {devices?.length ? (
-                <Select 
-                  value={selectedDevice?.toString()} 
-                  onValueChange={(v) => setSelectedDevice(Number(v))}
-                >
-                  <SelectTrigger className="bg-background">
-                    <SelectValue placeholder="Select device" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {devices.map((device) => (
-                      <SelectItem key={device.id} value={device.id.toString()}>
-                        {device.deviceName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              {selectedDevice ? (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-sm">{selectedDevice.display_name || selectedDevice.default_name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {selectedDevice.ipaddr4} • ID: {selectedDevice.id}
+                      </p>
+                    </div>
+                    <Badge variant="outline" className="text-green-400 border-green-400">
+                      Connected
+                    </Badge>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="w-full"
+                    onClick={() => setSelectedDevice(null)}
+                  >
+                    Change Device
+                  </Button>
+                </div>
               ) : (
-                <p className="text-sm text-muted-foreground">No devices registered</p>
+                <p className="text-sm text-muted-foreground">Click "Find PS5" to search ExtraHop for your PlayStation</p>
               )}
             </CardContent>
           </Card>

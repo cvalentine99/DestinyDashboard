@@ -97,6 +97,31 @@ const extrahopRouter = router({
       }
     }),
 
+  // Search devices by name pattern using /devices/search API
+  searchDevices: protectedProcedure
+    .input(z.object({ namePattern: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const config = await db.getExtrahopConfigByUser(ctx.user.id);
+      if (!config) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "ExtraHop not configured" });
+      }
+
+      try {
+        const client = new ExtrahopClient({ apiUrl: config.apiUrl, apiKey: config.apiKey });
+        const devices = await client.searchDevices({
+          filter: {
+            field: "name",
+            operand: input.namePattern,
+            operator: "~",
+          },
+          limit: 50,
+        });
+        return devices;
+      } catch (error: any) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+      }
+    }),
+
   // Get alerts (Threat Detections)
   getAlerts: protectedProcedure.query(async ({ ctx }) => {
     const config = await db.getExtrahopConfigByUser(ctx.user.id);
@@ -129,7 +154,7 @@ const extrahopRouter = router({
       try {
         const client = new ExtrahopClient({ apiUrl: config.apiUrl, apiKey: config.apiKey });
         const now = Date.now();
-        const result = await client.getDetections({
+        const result = await client.searchDetections({
           from: input?.from || now - 24 * 60 * 60 * 1000, // Last 24 hours
           until: input?.until || now,
           limit: input?.limit || 50,
@@ -195,9 +220,11 @@ const extrahopRouter = router({
         const metrics = await client.queryMetrics({
           cycle: input?.cycle || "5min",
           from: now - 60 * 60 * 1000, // Last hour
+          until: 0,
           metric_category: input?.metricCategory || "net",
           metric_specs: [{ name: input?.metricName || "bytes_in" }],
-          object_type: "application",
+          object_type: "network",
+          object_ids: [0], // All networks
         });
         
         return metrics;
@@ -247,7 +274,7 @@ const extrahopRouter = router({
         client.getAlerts(),
       ]);
 
-      const activeDevices = devices.filter(d => d.analysis_level > 0);
+      const activeDevices = devices.filter(d => (d.analysis_level || 0) > 0);
       const alertCounts = { critical: 0, high: 0, medium: 0, low: 0 };
       alerts.forEach(a => {
         if (a.severity >= 4) alertCounts.critical++;
