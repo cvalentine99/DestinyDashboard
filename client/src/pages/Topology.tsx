@@ -15,8 +15,10 @@ import {
   Zap,
   Eye,
   Flame,
-  Globe
+  Globe,
+  Home
 } from "lucide-react";
+import Breadcrumbs from "@/components/Breadcrumbs";
 
 // Destiny 2 Element Colors
 type ElementType = "solar" | "arc" | "void" | "stasis" | "strand";
@@ -597,7 +599,17 @@ export default function Topology() {
       </nav>
 
       {/* Main Content */}
-      <main className="pt-14 h-screen flex">
+      <main className="pt-14 h-screen flex flex-col">
+        {/* Breadcrumbs */}
+        <div className="px-4 py-2 border-b border-border bg-background/50">
+          <Breadcrumbs items={[
+            { label: "Command Center", href: "/dashboard" },
+            { label: "Topology" }
+          ]} />
+        </div>
+        
+        {/* Canvas Container */}
+        <div className="flex-1 flex">
         {/* Canvas Area */}
         <div ref={containerRef} className="flex-1 relative">
           <canvas 
@@ -732,6 +744,7 @@ export default function Topology() {
               </ul>
             </div>
           </div>
+        </div>
         </div>
       </main>
     </div>

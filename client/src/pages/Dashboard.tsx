@@ -29,7 +29,8 @@ import {
   Home,
   Target,
   Map,
-  Crosshair
+  Crosshair,
+  Trophy
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import LoreChatbot from "@/components/LoreChatbot";
@@ -48,6 +49,34 @@ export default function Dashboard() {
   const [location] = useLocation();
   const [statusMessages, setStatusMessages] = useState<string[]>([]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+
+  // Minimum swipe distance for gesture detection
+  const minSwipeDistance = 50;
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+    
+    if (isRightSwipe && !mobileMenuOpen) {
+      setMobileMenuOpen(true);
+    }
+    if (isLeftSwipe && mobileMenuOpen) {
+      setMobileMenuOpen(false);
+    }
+  };
 
   // Fetch dashboard data
   const { data: dashboardData, isLoading, refetch } = trpc.extrahop.getDashboardSummary.useQuery(
@@ -100,7 +129,12 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div 
+      className="min-h-screen bg-background"
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+    >
       {/* Top Navigation */}
       <nav className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-md border-b border-border">
         <div className="container flex items-center justify-between h-14">
@@ -116,6 +150,7 @@ export default function Dashboard() {
               <NavLink href="/topology" active={location === "/topology"}>Topology</NavLink>
               <NavLink href="/game" active={location === "/game"}>Mini-Game</NavLink>
               <NavLink href="/settings" active={location === "/settings"}>Settings</NavLink>
+              <NavLink href="/triumphs" active={location === "/triumphs"}>Triumphs</NavLink>
             </div>
             
             {/* Mobile Menu Button */}
@@ -159,6 +194,9 @@ export default function Dashboard() {
             </MobileNavLink>
             <MobileNavLink href="/settings" icon={<Settings className="h-4 w-4" />} active={location === "/settings"} onClick={() => setMobileMenuOpen(false)}>
               Settings
+            </MobileNavLink>
+            <MobileNavLink href="/triumphs" icon={<Trophy className="h-4 w-4" />} active={location === "/triumphs"} onClick={() => setMobileMenuOpen(false)}>
+              Triumphs
             </MobileNavLink>
             <div className="pt-2 border-t border-border">
               <div className="text-xs text-muted-foreground px-3 py-2">

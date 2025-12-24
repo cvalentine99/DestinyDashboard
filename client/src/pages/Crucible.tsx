@@ -39,6 +39,7 @@ import { toast } from "sonner";
 import LoreChatbot from "@/components/LoreChatbot";
 import GhostVoiceAlerts from "@/components/GhostVoiceAlerts";
 import BPFFilterBuilder from "@/components/BPFFilterBuilder";
+import Breadcrumbs from "@/components/Breadcrumbs";
 
 // The Nine Logo - Mysterious symbol
 function TheNineLogo({ className = "h-8 w-8" }: { className?: string }) {
@@ -606,6 +607,11 @@ export default function Crucible() {
 
       {/* Main Content */}
       <main className="container py-6 space-y-6">
+        {/* Breadcrumbs */}
+        <Breadcrumbs items={[
+          { label: "Command Center", href: "/dashboard" },
+          { label: "Crucible Ops" }
+        ]} />
         {/* Top Row: Telemetry + Security + VoIP */}
         <div className="grid grid-cols-12 gap-6">
           {/* Crucible Telemetry */}

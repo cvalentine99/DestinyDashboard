@@ -21,6 +21,7 @@ import {
   ChevronLeft,
   Save
 } from "lucide-react";
+import Breadcrumbs from "@/components/Breadcrumbs";
 
 // Destiny Tricorn SVG Logo
 const TricornLogo = () => (
@@ -178,6 +179,12 @@ export default function Settings() {
       {/* Main Content */}
       <main className="pt-20 pb-8">
         <div className="container max-w-4xl">
+          {/* Breadcrumbs */}
+          <Breadcrumbs items={[
+            { label: "Command Center", href: "/dashboard" },
+            { label: "Settings" }
+          ]} />
+          
           <div className="mb-8">
             <h1 className="text-3xl font-bold tracking-wider text-gradient-destiny mb-2">
               CONFIGURATION
