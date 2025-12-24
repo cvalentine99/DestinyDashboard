@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { getLoginUrl } from "@/const";
 import LoreChatbot from "@/components/LoreChatbot";
+import Breadcrumbs from "@/components/Breadcrumbs";
 
 // Category icons
 const categoryIcons: Record<string, React.ReactNode> = {
@@ -176,6 +177,12 @@ export default function Triumphs() {
       </header>
 
       <main className="container mx-auto px-4 py-8">
+        {/* Breadcrumbs */}
+        <Breadcrumbs items={[
+          { label: "Command Center", href: "/dashboard" },
+          { label: "Triumphs" }
+        ]} />
+
         {/* Titles Earned */}
         {titles.length > 0 && (
           <Card className="mb-8 bg-gradient-to-r from-yellow-900/20 to-amber-900/20 border-yellow-600/30">

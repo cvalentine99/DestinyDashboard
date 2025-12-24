@@ -271,3 +271,7 @@
 - [x] Add breadcrumbs to Settings page (Home > Command Center > Settings)
 - [x] Implement swipe gestures to open/close mobile menu (swipe right to open, left to close)
 - [x] Created reusable Breadcrumbs component
+
+## Navigation Improvements Phase 3
+- [x] Add breadcrumbs to Mini-Game page (Home > Command Center > Mini-Game)
+- [x] Add breadcrumbs to Triumphs page (Home > Command Center > Triumphs)

@@ -22,6 +22,7 @@ import {
 import LoreChatbot from "@/components/LoreChatbot";
 import VirtualJoystick from "@/components/VirtualJoystick";
 import LoadoutSelector from "@/components/LoadoutSelector";
+import Breadcrumbs from "@/components/Breadcrumbs";
 
 // ============================================================================
 // GAME CONSTANTS
@@ -1624,7 +1625,17 @@ export default function Game() {
       </nav>
 
       {/* Main Content */}
-      <main className="pt-14 h-screen flex">
+      <main className="pt-14 h-screen flex flex-col">
+        {/* Breadcrumbs */}
+        <div className="px-4 py-2 border-b border-border bg-background/50">
+          <Breadcrumbs items={[
+            { label: "Command Center", href: "/dashboard" },
+            { label: "Mini-Game" }
+          ]} />
+        </div>
+        
+        {/* Game Container */}
+        <div className="flex-1 flex">
         {/* Game Area */}
         <div className="flex-1 relative">
           <div className="absolute inset-0 p-4">
@@ -1812,6 +1823,7 @@ export default function Game() {
               ))}
             </CardContent>
           </Card>
+        </div>
         </div>
       </main>
 
