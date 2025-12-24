@@ -9,6 +9,7 @@ import Dashboard from "./pages/Dashboard";
 import Settings from "./pages/Settings";
 import Game from "./pages/Game";
 import Topology from "./pages/Topology";
+import Crucible from "./pages/Crucible";
 
 function Router() {
   return (
@@ -18,6 +19,7 @@ function Router() {
       <Route path="/topology" component={Topology} />
       <Route path="/settings" component={Settings} />
       <Route path="/game" component={Game} />
+      <Route path="/crucible" component={Crucible} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>

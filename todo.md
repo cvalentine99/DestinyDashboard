@@ -63,3 +63,16 @@
 ## Urgent Fix
 - [x] Remove all "Second Sight" branding from the application
 - [x] Rename to "Vanguard Ops" / "Vanguard Network Operations"
+
+## Crucible Operations Center (PvP Match Monitoring)
+- [x] PS5 device configuration (Sony Interactive Entertainment BCD278)
+- [x] Bungie server traffic pattern detection
+- [x] Real-time PvP match state detection (orbit, matchmaking, in-match, post-game)
+- [x] Connection quality monitoring (latency, packet loss, jitter)
+- [x] Real-time latency graph during matches
+- [x] Peer-to-peer connection analysis (hybrid P2P networking)
+- [x] Peer count and connection quality per peer
+- [x] Match timeline event logging
+- [x] Post-game match review with network events overlay
+- [x] Lag spike detection and alerting
+- [x] Crucible Operations Center dashboard UI

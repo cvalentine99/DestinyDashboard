@@ -15,6 +15,13 @@
       "when": 1766596368857,
       "tag": "0001_zippy_william_stryker",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1766599081462,
+      "tag": "0002_smiling_venus",
+      "breakpoints": true
     }
   ]
 }

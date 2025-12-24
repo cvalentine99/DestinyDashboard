@@ -168,3 +168,148 @@ export const notificationPrefs = mysqlTable("notification_prefs", {
 
 export type NotificationPref = typeof notificationPrefs.$inferSelect;
 export type InsertNotificationPref = typeof notificationPrefs.$inferInsert;
+
+
+// Crucible Operations - PS5 Device Configuration
+export const crucibleDevices = mysqlTable("crucible_devices", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  configId: int("configId").notNull(), // ExtraHop config reference
+  extrahopDeviceId: bigint("extrahopDeviceId", { mode: "number" }),
+  deviceName: varchar("deviceName", { length: 256 }).notNull(), // e.g., "Sony Interactive Entertainment BCD278"
+  macAddress: varchar("macAddress", { length: 64 }),
+  ipAddress: varchar("ipAddress", { length: 64 }),
+  platform: varchar("platform", { length: 64 }).default("PS5").notNull(),
+  isActive: boolean("isActive").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type CrucibleDevice = typeof crucibleDevices.$inferSelect;
+export type InsertCrucibleDevice = typeof crucibleDevices.$inferInsert;
+
+// Crucible Match Sessions
+export const crucibleMatches = mysqlTable("crucible_matches", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  deviceId: int("deviceId").notNull(), // Reference to crucibleDevices
+  matchState: mysqlEnum("matchState", ["orbit", "matchmaking", "loading", "in_match", "post_game", "unknown"]).default("unknown").notNull(),
+  gameMode: varchar("gameMode", { length: 64 }), // Control, Clash, Trials, Iron Banner, etc.
+  startTime: timestamp("startTime"),
+  endTime: timestamp("endTime"),
+  durationMs: bigint("durationMs", { mode: "number" }),
+  // Connection quality summary
+  avgLatencyMs: int("avgLatencyMs"),
+  maxLatencyMs: int("maxLatencyMs"),
+  minLatencyMs: int("minLatencyMs"),
+  packetLossPercent: int("packetLossPercent"), // Stored as percentage * 100 (e.g., 150 = 1.5%)
+  avgJitterMs: int("avgJitterMs"),
+  // Peer info
+  peerCount: int("peerCount"),
+  bungieServerIp: varchar("bungieServerIp", { length: 64 }),
+  // Match result
+  result: mysqlEnum("result", ["victory", "defeat", "mercy", "disconnect", "unknown"]),
+  metadata: json("metadata"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type CrucibleMatch = typeof crucibleMatches.$inferSelect;
+export type InsertCrucibleMatch = typeof crucibleMatches.$inferInsert;
+
+// Crucible Connection Quality Samples (high-frequency metrics during match)
+export const crucibleMetrics = mysqlTable("crucible_metrics", {
+  id: int("id").autoincrement().primaryKey(),
+  matchId: int("matchId").notNull(), // Reference to crucibleMatches
+  timestampNs: bigint("timestampNs", { mode: "bigint" }).notNull(), // Nanosecond precision
+  latencyMs: int("latencyMs"),
+  jitterMs: int("jitterMs"),
+  packetsSent: bigint("packetsSent", { mode: "number" }),
+  packetsReceived: bigint("packetsReceived", { mode: "number" }),
+  packetsLost: bigint("packetsLost", { mode: "number" }),
+  bytesSent: bigint("bytesSent", { mode: "number" }),
+  bytesReceived: bigint("bytesReceived", { mode: "number" }),
+  // Traffic breakdown
+  bungieTrafficBytes: bigint("bungieTrafficBytes", { mode: "number" }),
+  p2pTrafficBytes: bigint("p2pTrafficBytes", { mode: "number" }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type CrucibleMetric = typeof crucibleMetrics.$inferSelect;
+export type InsertCrucibleMetric = typeof crucibleMetrics.$inferInsert;
+
+// Crucible Peer Connections (P2P analysis)
+export const cruciblePeers = mysqlTable("crucible_peers", {
+  id: int("id").autoincrement().primaryKey(),
+  matchId: int("matchId").notNull(), // Reference to crucibleMatches
+  peerIp: varchar("peerIp", { length: 64 }).notNull(),
+  peerPort: int("peerPort"),
+  connectionStartTime: timestamp("connectionStartTime"),
+  connectionEndTime: timestamp("connectionEndTime"),
+  avgLatencyMs: int("avgLatencyMs"),
+  maxLatencyMs: int("maxLatencyMs"),
+  packetsSent: bigint("packetsSent", { mode: "number" }),
+  packetsReceived: bigint("packetsReceived", { mode: "number" }),
+  bytesSent: bigint("bytesSent", { mode: "number" }),
+  bytesReceived: bigint("bytesReceived", { mode: "number" }),
+  // Geolocation (if available from ExtraHop)
+  geoCountry: varchar("geoCountry", { length: 64 }),
+  geoRegion: varchar("geoRegion", { length: 128 }),
+  geoCity: varchar("geoCity", { length: 128 }),
+  isp: varchar("isp", { length: 256 }),
+  metadata: json("metadata"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type CruciblePeer = typeof cruciblePeers.$inferSelect;
+export type InsertCruciblePeer = typeof cruciblePeers.$inferInsert;
+
+// Crucible Match Timeline Events (lag spikes, disconnects, etc.)
+export const crucibleEvents = mysqlTable("crucible_events", {
+  id: int("id").autoincrement().primaryKey(),
+  matchId: int("matchId").notNull(), // Reference to crucibleMatches
+  timestampNs: bigint("timestampNs", { mode: "bigint" }).notNull(), // Nanosecond precision
+  eventType: mysqlEnum("eventType", [
+    "match_start",
+    "match_end",
+    "lag_spike",
+    "packet_loss_spike",
+    "peer_joined",
+    "peer_left",
+    "connection_degraded",
+    "connection_recovered",
+    "bungie_server_switch",
+    "network_anomaly",
+    "high_jitter",
+    "disconnect",
+    "reconnect"
+  ]).notNull(),
+  severity: mysqlEnum("severity", ["info", "warning", "critical"]).default("info").notNull(),
+  description: text("description"),
+  // Event-specific data
+  latencyMs: int("latencyMs"),
+  packetLossPercent: int("packetLossPercent"),
+  affectedPeerIp: varchar("affectedPeerIp", { length: 64 }),
+  metadata: json("metadata"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type CrucibleEvent = typeof crucibleEvents.$inferSelect;
+export type InsertCrucibleEvent = typeof crucibleEvents.$inferInsert;
+
+// Known Bungie Server IPs for traffic detection
+export const bungieServers = mysqlTable("bungie_servers", {
+  id: int("id").autoincrement().primaryKey(),
+  ipAddress: varchar("ipAddress", { length: 64 }).notNull().unique(),
+  ipRange: varchar("ipRange", { length: 64 }), // CIDR notation
+  serverType: varchar("serverType", { length: 64 }), // auth, matchmaking, game, api
+  region: varchar("region", { length: 64 }),
+  description: varchar("description", { length: 256 }),
+  isActive: boolean("isActive").default(true).notNull(),
+  lastSeen: timestamp("lastSeen"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type BungieServer = typeof bungieServers.$inferSelect;
+export type InsertBungieServer = typeof bungieServers.$inferInsert;

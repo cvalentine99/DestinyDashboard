@@ -10,7 +10,13 @@ import {
   loreEntries, InsertLoreEntry, LoreEntry,
   chatHistory, InsertChatHistory,
   gameScores, InsertGameScore,
-  notificationPrefs, InsertNotificationPref
+  notificationPrefs, InsertNotificationPref,
+  crucibleDevices, InsertCrucibleDevice, CrucibleDevice,
+  crucibleMatches, InsertCrucibleMatch, CrucibleMatch,
+  crucibleMetrics, InsertCrucibleMetric, CrucibleMetric,
+  cruciblePeers, InsertCruciblePeer, CruciblePeer,
+  crucibleEvents, InsertCrucibleEvent, CrucibleEvent,
+  bungieServers, InsertBungieServer, BungieServer
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -386,4 +392,259 @@ export async function upsertNotificationPrefs(prefs: InsertNotificationPref) {
   } else {
     await db.insert(notificationPrefs).values(prefs);
   }
+}
+
+
+// ============================================
+// Crucible Operations Center - Database Functions
+// ============================================
+
+// Crucible Device operations
+export async function createCrucibleDevice(device: InsertCrucibleDevice) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(crucibleDevices).values(device);
+  return result[0].insertId;
+}
+
+export async function getCrucibleDevices(userId: number): Promise<CrucibleDevice[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(crucibleDevices)
+    .where(eq(crucibleDevices.userId, userId))
+    .orderBy(desc(crucibleDevices.updatedAt));
+}
+
+export async function getCrucibleDeviceById(id: number): Promise<CrucibleDevice | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(crucibleDevices)
+    .where(eq(crucibleDevices.id, id))
+    .limit(1);
+  return result[0] || null;
+}
+
+export async function updateCrucibleDevice(id: number, updates: Partial<InsertCrucibleDevice>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(crucibleDevices).set(updates).where(eq(crucibleDevices.id, id));
+}
+
+export async function deleteCrucibleDevice(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(crucibleDevices).where(eq(crucibleDevices.id, id));
+}
+
+// Crucible Match operations
+export async function createCrucibleMatch(match: InsertCrucibleMatch) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(crucibleMatches).values(match);
+  return result[0].insertId;
+}
+
+export async function getCrucibleMatches(userId: number, limit = 20): Promise<CrucibleMatch[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(crucibleMatches)
+    .where(eq(crucibleMatches.userId, userId))
+    .orderBy(desc(crucibleMatches.startTime))
+    .limit(limit);
+}
+
+export async function getCrucibleMatchById(id: number): Promise<CrucibleMatch | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(crucibleMatches)
+    .where(eq(crucibleMatches.id, id))
+    .limit(1);
+  return result[0] || null;
+}
+
+export async function getActiveMatch(deviceId: number): Promise<CrucibleMatch | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(crucibleMatches)
+    .where(and(
+      eq(crucibleMatches.deviceId, deviceId),
+      sql`${crucibleMatches.endTime} IS NULL`
+    ))
+    .orderBy(desc(crucibleMatches.startTime))
+    .limit(1);
+  return result[0] || null;
+}
+
+export async function updateCrucibleMatch(id: number, updates: Partial<InsertCrucibleMatch>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(crucibleMatches).set(updates).where(eq(crucibleMatches.id, id));
+}
+
+// Crucible Metrics operations (high-frequency samples)
+export async function createCrucibleMetric(metric: InsertCrucibleMetric) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.insert(crucibleMetrics).values(metric);
+}
+
+export async function createCrucibleMetricsBatch(metrics: InsertCrucibleMetric[]) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  if (metrics.length === 0) return;
+  await db.insert(crucibleMetrics).values(metrics);
+}
+
+export async function getMatchMetrics(matchId: number): Promise<CrucibleMetric[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(crucibleMetrics)
+    .where(eq(crucibleMetrics.matchId, matchId))
+    .orderBy(crucibleMetrics.timestampNs);
+}
+
+export async function getRecentMetrics(matchId: number, limit = 60): Promise<CrucibleMetric[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(crucibleMetrics)
+    .where(eq(crucibleMetrics.matchId, matchId))
+    .orderBy(desc(crucibleMetrics.timestampNs))
+    .limit(limit);
+}
+
+// Crucible Peer operations
+export async function createCruciblePeer(peer: InsertCruciblePeer) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(cruciblePeers).values(peer);
+  return result[0].insertId;
+}
+
+export async function getMatchPeers(matchId: number): Promise<CruciblePeer[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(cruciblePeers)
+    .where(eq(cruciblePeers.matchId, matchId))
+    .orderBy(cruciblePeers.connectionStartTime);
+}
+
+export async function updateCruciblePeer(id: number, updates: Partial<InsertCruciblePeer>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(cruciblePeers).set(updates).where(eq(cruciblePeers.id, id));
+}
+
+export async function getPeerByIp(matchId: number, peerIp: string): Promise<CruciblePeer | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(cruciblePeers)
+    .where(and(eq(cruciblePeers.matchId, matchId), eq(cruciblePeers.peerIp, peerIp)))
+    .limit(1);
+  return result[0] || null;
+}
+
+// Crucible Event operations
+export async function createCrucibleEvent(event: InsertCrucibleEvent) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(crucibleEvents).values(event);
+  return result[0].insertId;
+}
+
+export async function getMatchEvents(matchId: number): Promise<CrucibleEvent[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(crucibleEvents)
+    .where(eq(crucibleEvents.matchId, matchId))
+    .orderBy(crucibleEvents.timestampNs);
+}
+
+export async function getRecentEvents(matchId: number, limit = 20): Promise<CrucibleEvent[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(crucibleEvents)
+    .where(eq(crucibleEvents.matchId, matchId))
+    .orderBy(desc(crucibleEvents.timestampNs))
+    .limit(limit);
+}
+
+export async function getEventsByType(matchId: number, eventType: string): Promise<CrucibleEvent[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(crucibleEvents)
+    .where(and(
+      eq(crucibleEvents.matchId, matchId),
+      sql`${crucibleEvents.eventType} = ${eventType}`
+    ))
+    .orderBy(crucibleEvents.timestampNs);
+}
+
+// Bungie Server operations
+export async function upsertBungieServer(server: InsertBungieServer) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const existing = await db.select().from(bungieServers)
+    .where(eq(bungieServers.ipAddress, server.ipAddress))
+    .limit(1);
+  
+  if (existing.length > 0) {
+    await db.update(bungieServers)
+      .set({ ...server, lastSeen: new Date() })
+      .where(eq(bungieServers.id, existing[0].id));
+    return existing[0].id;
+  }
+  
+  const result = await db.insert(bungieServers).values(server);
+  return result[0].insertId;
+}
+
+export async function getBungieServers(): Promise<BungieServer[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(bungieServers)
+    .where(eq(bungieServers.isActive, true))
+    .orderBy(desc(bungieServers.lastSeen));
+}
+
+export async function isBungieServerIp(ip: string): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  const result = await db.select().from(bungieServers)
+    .where(eq(bungieServers.ipAddress, ip))
+    .limit(1);
+  return result.length > 0;
+}
+
+// Match statistics aggregation
+export async function getMatchStats(userId: number) {
+  const db = await getDb();
+  if (!db) return { totalMatches: 0, avgLatency: 0, avgPacketLoss: 0, victories: 0, defeats: 0 };
+  
+  const result = await db.select({
+    totalMatches: sql<number>`COUNT(*)`,
+    avgLatency: sql<number>`AVG(${crucibleMatches.avgLatencyMs})`,
+    avgPacketLoss: sql<number>`AVG(${crucibleMatches.packetLossPercent})`,
+    victories: sql<number>`SUM(CASE WHEN ${crucibleMatches.result} = 'victory' THEN 1 ELSE 0 END)`,
+    defeats: sql<number>`SUM(CASE WHEN ${crucibleMatches.result} = 'defeat' THEN 1 ELSE 0 END)`,
+  }).from(crucibleMatches)
+    .where(eq(crucibleMatches.userId, userId));
+  
+  return result[0] || { totalMatches: 0, avgLatency: 0, avgPacketLoss: 0, victories: 0, defeats: 0 };
+}
+
+// Get lag spike count for a match
+export async function getLagSpikeCount(matchId: number): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+  
+  const result = await db.select({
+    count: sql<number>`COUNT(*)`,
+  }).from(crucibleEvents)
+    .where(and(
+      eq(crucibleEvents.matchId, matchId),
+      sql`${crucibleEvents.eventType} = 'lag_spike'`
+    ));
+  
+  return result[0]?.count || 0;
 }

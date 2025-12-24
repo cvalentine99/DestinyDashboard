@@ -14,7 +14,8 @@ import {
   Zap,
   AlertTriangle,
   Users,
-  Radio
+  Radio,
+  Target
 } from "lucide-react";
 
 // Destiny Tricorn SVG Logo
@@ -206,6 +207,15 @@ export default function Home() {
               destinyTerm="Ghost Voice Protocol"
               color="stasis"
             />
+            <Link href="/crucible">
+              <FeatureCard
+                icon={<Target className="h-8 w-8" />}
+                title="Crucible Operations"
+                description="Real-time PvP match monitoring for your PS5. Track latency, peers, and connection quality during Crucible matches."
+                destinyTerm="Crucible Ops Center"
+                color="solar"
+              />
+            </Link>
           </div>
         </div>
       </section>
