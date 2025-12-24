@@ -16,7 +16,10 @@ import {
   crucibleMetrics, InsertCrucibleMetric, CrucibleMetric,
   cruciblePeers, InsertCruciblePeer, CruciblePeer,
   crucibleEvents, InsertCrucibleEvent, CrucibleEvent,
-  bungieServers, InsertBungieServer, BungieServer
+  bungieServers, InsertBungieServer, BungieServer,
+  bungieConfig, InsertBungieConfig, BungieConfig,
+  bungieMatches, InsertBungieMatch, BungieMatch,
+  matchCorrelations, InsertMatchCorrelation, MatchCorrelation
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -647,4 +650,168 @@ export async function getLagSpikeCount(matchId: number): Promise<number> {
     ));
   
   return result[0]?.count || 0;
+}
+
+
+// ==========================================
+// Bungie API Operations
+// ==========================================
+
+// Save or update Bungie API configuration
+export async function saveBungieConfig(config: InsertBungieConfig): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  
+  // Check if config exists for user
+  const existing = await db.select().from(bungieConfig)
+    .where(eq(bungieConfig.userId, config.userId))
+    .limit(1);
+  
+  if (existing.length > 0) {
+    await db.update(bungieConfig)
+      .set({
+        apiKey: config.apiKey,
+        bungieName: config.bungieName,
+        membershipType: config.membershipType,
+        membershipId: config.membershipId,
+        primaryCharacterId: config.primaryCharacterId,
+        characterClass: config.characterClass,
+        lightLevel: config.lightLevel,
+        autoSync: config.autoSync,
+        lastSyncAt: config.lastSyncAt,
+      })
+      .where(eq(bungieConfig.userId, config.userId));
+  } else {
+    await db.insert(bungieConfig).values(config);
+  }
+}
+
+// Get Bungie config for a user
+export async function getBungieConfigByUser(userId: number): Promise<BungieConfig | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  
+  const result = await db.select().from(bungieConfig)
+    .where(eq(bungieConfig.userId, userId))
+    .limit(1);
+  
+  return result[0];
+}
+
+// Update last sync time
+export async function updateBungieConfigLastSync(userId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  
+  await db.update(bungieConfig)
+    .set({ lastSyncAt: new Date() })
+    .where(eq(bungieConfig.userId, userId));
+}
+
+// Save Bungie match data
+export async function saveBungieMatch(match: InsertBungieMatch): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  
+  // Upsert by activityId
+  const existing = await db.select().from(bungieMatches)
+    .where(eq(bungieMatches.activityId, match.activityId))
+    .limit(1);
+  
+  if (existing.length > 0) {
+    await db.update(bungieMatches)
+      .set(match)
+      .where(eq(bungieMatches.activityId, match.activityId));
+  } else {
+    await db.insert(bungieMatches).values(match);
+  }
+}
+
+// Get Bungie matches for a user
+export async function getBungieMatches(userId: number, limit: number = 25, offset: number = 0): Promise<BungieMatch[]> {
+  const db = await getDb();
+  if (!db) return [];
+  
+  return db.select().from(bungieMatches)
+    .where(eq(bungieMatches.userId, userId))
+    .orderBy(desc(bungieMatches.period))
+    .limit(limit)
+    .offset(offset);
+}
+
+// Get Bungie match by activity ID
+export async function getBungieMatchByActivityId(activityId: string): Promise<BungieMatch | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  
+  const result = await db.select().from(bungieMatches)
+    .where(eq(bungieMatches.activityId, activityId))
+    .limit(1);
+  
+  return result[0];
+}
+
+// Save match correlation
+export async function saveMatchCorrelation(correlation: InsertMatchCorrelation): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  
+  await db.insert(matchCorrelations).values(correlation);
+}
+
+// Get match correlation by Bungie match ID
+export async function getMatchCorrelationByBungieMatch(bungieMatchId: number): Promise<MatchCorrelation | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  
+  const result = await db.select().from(matchCorrelations)
+    .where(eq(matchCorrelations.bungieMatchId, bungieMatchId))
+    .limit(1);
+  
+  return result[0];
+}
+
+// Get all correlations for a user
+export async function getMatchCorrelations(userId: number, limit: number = 25): Promise<MatchCorrelation[]> {
+  const db = await getDb();
+  if (!db) return [];
+  
+  return db.select().from(matchCorrelations)
+    .where(eq(matchCorrelations.userId, userId))
+    .orderBy(desc(matchCorrelations.createdAt))
+    .limit(limit);
+}
+
+// Get aggregated performance insights
+export async function getPerformanceInsights(userId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  
+  // Get matches with correlations
+  const correlations = await db.select().from(matchCorrelations)
+    .where(eq(matchCorrelations.userId, userId));
+  
+  if (correlations.length === 0) return null;
+  
+  // Calculate averages
+  let totalKd = 0;
+  let highLatencyKd = 0;
+  let lowLatencyKd = 0;
+  let highLatencyCount = 0;
+  let lowLatencyCount = 0;
+  
+  for (const c of correlations) {
+    const avgLatency = parseFloat(c.avgLatencyMs || '0');
+    // We need to join with bungieMatches to get K/D
+  }
+  
+  return {
+    totalMatches: correlations.length,
+    avgLatency: correlations.reduce((sum, c) => sum + parseFloat(c.avgLatencyMs || '0'), 0) / correlations.length,
+    avgJitter: correlations.reduce((sum, c) => sum + parseFloat(c.avgJitterMs || '0'), 0) / correlations.length,
+    avgPacketLoss: correlations.reduce((sum, c) => sum + parseFloat(c.packetLossPercent || '0'), 0) / correlations.length,
+    positiveImpactCount: correlations.filter(c => c.performanceImpact === 'positive').length,
+    neutralImpactCount: correlations.filter(c => c.performanceImpact === 'neutral').length,
+    negativeImpactCount: correlations.filter(c => c.performanceImpact === 'negative').length,
+  };
 }

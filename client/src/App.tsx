@@ -10,6 +10,7 @@ import Settings from "./pages/Settings";
 import Game from "./pages/Game";
 import Topology from "./pages/Topology";
 import Crucible from "./pages/Crucible";
+import BungieIntegration from "./pages/BungieIntegration";
 
 function Router() {
   return (
@@ -20,6 +21,7 @@ function Router() {
       <Route path="/settings" component={Settings} />
       <Route path="/game" component={Game} />
       <Route path="/crucible" component={Crucible} />
+      <Route path="/bungie" component={BungieIntegration} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>

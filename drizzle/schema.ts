@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, json, bigint, boolean } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, json, bigint, boolean, decimal } from "drizzle-orm/mysql-core";
 
 // Core user table backing auth flow
 export const users = mysqlTable("users", {
@@ -313,3 +313,96 @@ export const bungieServers = mysqlTable("bungie_servers", {
 
 export type BungieServer = typeof bungieServers.$inferSelect;
 export type InsertBungieServer = typeof bungieServers.$inferInsert;
+
+// Bungie API Configuration
+export const bungieConfig = mysqlTable("bungie_config", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  apiKey: varchar("apiKey", { length: 512 }).notNull(),
+  // Player identity
+  bungieName: varchar("bungieName", { length: 256 }), // e.g., "Guardian#1234"
+  membershipType: int("membershipType"), // PSN=2, Xbox=1, Steam=3, etc.
+  membershipId: varchar("membershipId", { length: 64 }),
+  // Primary character
+  primaryCharacterId: varchar("primaryCharacterId", { length: 64 }),
+  characterClass: varchar("characterClass", { length: 32 }), // Titan, Hunter, Warlock
+  lightLevel: int("lightLevel"),
+  // Sync settings
+  autoSync: boolean("autoSync").default(true).notNull(),
+  lastSyncAt: timestamp("lastSyncAt"),
+  isActive: boolean("isActive").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type BungieConfig = typeof bungieConfig.$inferSelect;
+export type InsertBungieConfig = typeof bungieConfig.$inferInsert;
+
+// Bungie Match Data (from PGCR)
+export const bungieMatches = mysqlTable("bungie_matches", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  // Bungie identifiers
+  activityId: varchar("activityId", { length: 64 }).notNull().unique(),
+  instanceId: varchar("instanceId", { length: 64 }),
+  // Match details
+  period: timestamp("period").notNull(), // When the match occurred
+  mode: int("mode").notNull(), // DestinyActivityModeType
+  modeName: varchar("modeName", { length: 64 }), // Human readable (Control, Clash, etc.)
+  mapHash: bigint("mapHash", { mode: "number" }),
+  mapName: varchar("mapName", { length: 128 }),
+  durationSeconds: int("durationSeconds"),
+  isPrivate: boolean("isPrivate").default(false).notNull(),
+  // Player performance
+  kills: int("kills").default(0).notNull(),
+  deaths: int("deaths").default(0).notNull(),
+  assists: int("assists").default(0).notNull(),
+  kd: decimal("kd", { precision: 6, scale: 3 }), // e.g., 1.500
+  kda: decimal("kda", { precision: 6, scale: 3 }),
+  efficiency: decimal("efficiency", { precision: 6, scale: 3 }),
+  score: int("score").default(0),
+  standing: int("standing"), // 0 = victory, 1 = defeat
+  // Team scores
+  teamScore: int("teamScore"),
+  opponentScore: int("opponentScore"),
+  // Extended stats
+  precisionKills: int("precisionKills"),
+  superKills: int("superKills"),
+  grenadeKills: int("grenadeKills"),
+  meleeKills: int("meleeKills"),
+  abilityKills: int("abilityKills"),
+  longestKillSpree: int("longestKillSpree"),
+  // Raw PGCR data
+  pgcrData: json("pgcrData"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type BungieMatch = typeof bungieMatches.$inferSelect;
+export type InsertBungieMatch = typeof bungieMatches.$inferInsert;
+
+// Network-Match Correlation (links ExtraHop metrics to Bungie matches)
+export const matchCorrelations = mysqlTable("match_correlations", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  // References
+  bungieMatchId: int("bungieMatchId").notNull(), // Reference to bungieMatches
+  crucibleMatchId: int("crucibleMatchId"), // Reference to crucibleMatches (if available)
+  // Network metrics during match
+  avgLatencyMs: decimal("avgLatencyMs", { precision: 8, scale: 3 }),
+  maxLatencyMs: decimal("maxLatencyMs", { precision: 8, scale: 3 }),
+  minLatencyMs: decimal("minLatencyMs", { precision: 8, scale: 3 }),
+  avgJitterMs: decimal("avgJitterMs", { precision: 8, scale: 3 }),
+  maxJitterMs: decimal("maxJitterMs", { precision: 8, scale: 3 }),
+  packetLossPercent: decimal("packetLossPercent", { precision: 5, scale: 2 }),
+  lagSpikeCount: int("lagSpikeCount").default(0),
+  // Correlation analysis
+  performanceImpact: mysqlEnum("performanceImpact", ["positive", "neutral", "negative"]).default("neutral"),
+  insights: json("insights"), // Array of insight strings
+  // Timestamps for correlation matching
+  networkStartTime: timestamp("networkStartTime"),
+  networkEndTime: timestamp("networkEndTime"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type MatchCorrelation = typeof matchCorrelations.$inferSelect;
+export type InsertMatchCorrelation = typeof matchCorrelations.$inferInsert;

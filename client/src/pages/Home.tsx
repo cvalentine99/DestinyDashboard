@@ -15,7 +15,8 @@ import {
   AlertTriangle,
   Users,
   Radio,
-  Target
+  Target,
+  Trophy
 } from "lucide-react";
 
 // Destiny Tricorn SVG Logo
@@ -214,6 +215,15 @@ export default function Home() {
                 description="Real-time PvP match monitoring for your PS5. Track latency, peers, and connection quality during Crucible matches."
                 destinyTerm="Crucible Ops Center"
                 color="solar"
+              />
+            </Link>
+            <Link href="/bungie">
+              <FeatureCard
+                icon={<Trophy className="h-8 w-8" />}
+                title="Bungie API"
+                description="Connect to Bungie.net to pull Crucible match results. Correlate K/D, maps, and game modes with network performance."
+                destinyTerm="Guardian Records"
+                color="void"
               />
             </Link>
           </div>

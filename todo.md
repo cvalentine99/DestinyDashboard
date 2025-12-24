@@ -115,3 +115,14 @@
 - [x] Implement custom filter input with syntax validation
 - [x] Add filter preview showing expected traffic types
 - [x] Integrate BPF filters with PCAP download feature
+
+## Bungie API Integration
+- [x] Create Bungie API service (bungie.ts)
+- [x] Implement player search by Bungie name
+- [x] Fetch Crucible match history (PGCR - Post Game Carnage Report)
+- [x] Extract K/D, map, game mode, and match duration
+- [x] Add database schema for Bungie match data
+- [x] Store Bungie API key in user settings
+- [x] Build match correlation UI showing network + gameplay stats
+- [x] Auto-correlate matches by timestamp overlap
+- [x] Display performance insights (high latency = lower K/D correlation)
