@@ -1,4 +1,5 @@
 import { useAuth } from "@/_core/hooks/useAuth";
+import { TricornLogo } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getLoginUrl } from "@/const";
@@ -19,14 +20,6 @@ import {
   Trophy
 } from "lucide-react";
 
-// Destiny Tricorn SVG Logo
-const TricornLogo = () => (
-  <svg viewBox="0 0 100 100" className="w-16 h-16 tricorn-glow" fill="currentColor">
-    <path d="M50 5 L95 85 L50 65 L5 85 Z" />
-    <path d="M50 25 L75 70 L50 55 L25 70 Z" opacity="0.6" />
-  </svg>
-);
-
 export default function Home() {
   const { user, loading, isAuthenticated } = useAuth();
 
@@ -36,7 +29,7 @@ export default function Home() {
       <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
         <div className="container flex items-center justify-between h-16">
           <div className="flex items-center gap-3">
-            <TricornLogo />
+            <TricornLogo className="w-16 h-16 tricorn-glow" />
             <div>
               <h1 className="text-lg font-bold tracking-wider text-gradient-destiny">
                 VANGUARD OPS
@@ -83,7 +76,7 @@ export default function Home() {
             <div className="flex justify-center mb-8">
               <div className="relative">
                 <div className="absolute inset-0 blur-3xl bg-primary/20 rounded-full" />
-                <TricornLogo />
+                <TricornLogo className="w-16 h-16 tricorn-glow" />
               </div>
             </div>
             
@@ -298,7 +291,7 @@ export default function Home() {
         <div className="container">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2">
-              <TricornLogo />
+              <TricornLogo className="w-16 h-16 tricorn-glow" />
               <span className="text-sm text-muted-foreground">
                 Vanguard Network Operations • Powered by ExtraHop
               </span>

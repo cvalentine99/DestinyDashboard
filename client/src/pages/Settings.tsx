@@ -1,4 +1,5 @@
 import { useAuth } from "@/_core/hooks/useAuth";
+import { TricornLogo } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -22,14 +23,6 @@ import {
   Save
 } from "lucide-react";
 import Breadcrumbs from "@/components/Breadcrumbs";
-
-// Destiny Tricorn SVG Logo
-const TricornLogo = () => (
-  <svg viewBox="0 0 100 100" className="w-8 h-8" fill="currentColor">
-    <path d="M50 5 L95 85 L50 65 L5 85 Z" />
-    <path d="M50 25 L75 70 L50 55 L25 70 Z" opacity="0.6" />
-  </svg>
-);
 
 export default function Settings() {
   const { user, loading: authLoading, isAuthenticated } = useAuth();

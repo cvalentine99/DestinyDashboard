@@ -1,4 +1,5 @@
 import { useAuth } from "@/_core/hooks/useAuth";
+import { TricornLogo } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -34,14 +35,6 @@ import {
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import LoreChatbot from "@/components/LoreChatbot";
-
-// Destiny Tricorn SVG Logo
-const TricornLogo = () => (
-  <svg viewBox="0 0 100 100" className="w-8 h-8" fill="currentColor">
-    <path d="M50 5 L95 85 L50 65 L5 85 Z" />
-    <path d="M50 25 L75 70 L50 55 L25 70 Z" opacity="0.6" />
-  </svg>
-);
 
 export default function Dashboard() {
   const { user, loading: authLoading, isAuthenticated } = useAuth();
@@ -81,7 +74,10 @@ export default function Dashboard() {
   // Fetch dashboard data
   const { data: dashboardData, isLoading, refetch } = trpc.extrahop.getDashboardSummary.useQuery(
     undefined,
-    { refetchInterval: 30000 } // Refresh every 30 seconds
+    { 
+      refetchInterval: 30000, // Refresh every 30 seconds
+      staleTime: 15000, // Consider data fresh for 15 seconds to reduce refetches
+    }
   );
 
   // Redirect if not authenticated
