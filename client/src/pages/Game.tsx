@@ -20,6 +20,7 @@ import {
   Skull
 } from "lucide-react";
 import LoreChatbot from "@/components/LoreChatbot";
+import VirtualJoystick from "@/components/VirtualJoystick";
 
 // ============================================================================
 // GAME CONSTANTS
@@ -354,6 +355,24 @@ export default function Game() {
   const [selectedClass, setSelectedClass] = useState<GuardianClass>("hunter");
   const [highScore, setHighScore] = useState(0);
   const idCounterRef = useRef(0);
+  
+  // Touch control state
+  const touchMoveRef = useRef({ dx: 0, dy: 0 });
+  const touchFiringRef = useRef(false);
+  
+  // Game stats tracking for achievements
+  const gameStatsRef = useRef({
+    dregKills: 0, vandalKills: 0, captainKills: 0,
+    thrallKills: 0, acolyteKills: 0, knightKills: 0,
+    goblinKills: 0, hobgoblinKills: 0, minotaurKills: 0,
+    ogreKills: 0, servitorKills: 0, hydraKills: 0,
+    flawlessOgre: 0, flawlessServitor: 0, flawlessHydra: 0,
+    autoRifleKills: 0, handCannonKills: 0, pulseRifleKills: 0, rocketLauncherKills: 0,
+    commonEngrams: 0, uncommonEngrams: 0, rareEngrams: 0, legendaryEngrams: 0, exoticEngrams: 0,
+    abilitiesUsed: 0, supersUsed: 0,
+    clearedCosmodrome: false, clearedEuropa: false, clearedDreamingCity: false,
+    bossHealthAtStart: 0, // For tracking flawless boss kills
+  });
 
   // tRPC queries
   const { data: leaderboard } = trpc.game.getLeaderboard.useQuery(
@@ -473,6 +492,9 @@ export default function Game() {
     const classData = GUARDIAN_CLASSES[guardian.class];
     guardian.abilityActive = true;
     guardian.abilityCooldown = classData.abilityCooldown;
+    
+    // Track ability usage for achievements
+    gameStatsRef.current.abilitiesUsed++;
 
     if (guardian.class === "hunter") {
       // Dodge - brief invincibility
@@ -506,6 +528,9 @@ export default function Game() {
     if (guardian.superMeter < 100) return;
 
     guardian.superMeter = 0;
+    
+    // Track super usage for achievements
+    gameStatsRef.current.supersUsed++;
     
     // Super attack - damage all enemies on screen
     const enemies = enemiesRef.current;
@@ -813,8 +838,19 @@ export default function Game() {
       if (guardian.invincibleTimer <= 0) guardian.invincible = false;
     }
 
-    // Auto-fire when mouse is down
-    if (mouseDownRef.current) fireWeapon();
+    // Handle touch movement from virtual joystick
+    const touchMove = touchMoveRef.current;
+    if (touchMove.dx !== 0 || touchMove.dy !== 0) {
+      const moveSpeed = 8;
+      guardian.x += touchMove.dx * moveSpeed;
+      guardian.y += touchMove.dy * moveSpeed;
+      // Clamp to canvas bounds
+      guardian.x = Math.max(0, Math.min(canvas.width - guardian.width, guardian.x));
+      guardian.y = Math.max(100, Math.min(canvas.height - guardian.height - 20, guardian.y));
+    }
+
+    // Auto-fire when mouse is down or touch firing
+    if (mouseDownRef.current || touchFiringRef.current) fireWeapon();
 
     // Clear and draw background
     ctx.fillStyle = levelData.background;
@@ -869,6 +905,17 @@ export default function Game() {
         pointsGained += engram.type.points * (1 + gameState.combo * 0.1);
         comboIncrement++;
         spawnParticles(engram.x, engram.y, engram.type.color, 8);
+        
+        // Track engram for achievements
+        const stats = gameStatsRef.current;
+        switch (engram.type.type) {
+          case 'common': stats.commonEngrams++; break;
+          case 'uncommon': stats.uncommonEngrams++; break;
+          case 'rare': stats.rareEngrams++; break;
+          case 'legendary': stats.legendaryEngrams++; break;
+          case 'exotic': stats.exoticEngrams++; break;
+        }
+        
         return false;
       }
 
@@ -932,6 +979,20 @@ export default function Game() {
         pointsGained += enemyData.points;
         guardian.superMeter = Math.min(100, guardian.superMeter + 5);
         spawnParticles(enemy.x + enemyData.size / 2, enemy.y + enemyData.size / 2, enemyData.color, 15);
+        
+        // Track kill for achievements
+        const stats = gameStatsRef.current;
+        switch (enemy.type) {
+          case 'dreg': stats.dregKills++; break;
+          case 'vandal': stats.vandalKills++; break;
+          case 'captain': stats.captainKills++; break;
+          case 'thrall': stats.thrallKills++; break;
+          case 'acolyte': stats.acolyteKills++; break;
+          case 'knight': stats.knightKills++; break;
+          case 'goblin': stats.goblinKills++; break;
+          case 'hobgoblin': stats.hobgoblinKills++; break;
+          case 'minotaur': stats.minotaurKills++; break;
+        }
         
         // Chance to drop powerup
         if (Math.random() < 0.1) spawnPowerup();
@@ -1007,6 +1068,24 @@ export default function Game() {
         pointsGained += bossData.points;
         spawnParticles(boss.x + bossData.size / 2, boss.y + bossData.size / 2, bossData.color, 100);
         toast.success(`BOSS DEFEATED: ${bossData.name}!`);
+        
+        // Track boss kill for achievements
+        const stats = gameStatsRef.current;
+        const guardian = guardianRef.current;
+        switch (boss.type) {
+          case 'ogre': 
+            stats.ogreKills++; 
+            if (guardian.health === guardian.maxHealth) stats.flawlessOgre++;
+            break;
+          case 'servitor': 
+            stats.servitorKills++; 
+            if (guardian.health === guardian.maxHealth) stats.flawlessServitor++;
+            break;
+          case 'hydra': 
+            stats.hydraKills++; 
+            if (guardian.health === guardian.maxHealth) stats.flawlessHydra++;
+            break;
+        }
         bossRef.current = null;
         setGameState(prev => ({ 
           ...prev, 
@@ -1018,6 +1097,15 @@ export default function Game() {
         if (gameState.wave >= 5) {
           const levels = Object.keys(LEVELS) as LevelType[];
           const currentIndex = levels.indexOf(gameState.currentLevel);
+          
+          // Track level completion for achievements
+          const stats = gameStatsRef.current;
+          switch (gameState.currentLevel) {
+            case 'cosmodrome': stats.clearedCosmodrome = true; break;
+            case 'europa': stats.clearedEuropa = true; break;
+            case 'dreamingCity': stats.clearedDreamingCity = true; break;
+          }
+          
           if (currentIndex < levels.length - 1) {
             setGameState(prev => ({
               ...prev,
@@ -1379,6 +1467,20 @@ export default function Game() {
     }
   }, [gameState.state, gameState.level, gameState.wave, gameState.bossActive, gameLoop, spawnEngram, spawnEnemy, spawnBoss, spawnPowerup]);
 
+  // Submit achievements mutation
+  const submitAchievementsMutation = trpc.achievements.submitGameStats.useMutation({
+    onSuccess: (data) => {
+      if (data.newlyCompleted.length > 0) {
+        data.newlyCompleted.forEach(ach => {
+          toast.success(`TRIUMPH UNLOCKED: ${ach.name}`, {
+            description: `+${ach.triumphPoints} Triumph Points`,
+            duration: 5000,
+          });
+        });
+      }
+    },
+  });
+
   // Handle game over
   useEffect(() => {
     if (gameState.state === "gameover" || gameState.state === "victory") {
@@ -1392,8 +1494,49 @@ export default function Game() {
           });
         }
       }
+      
+      // Submit game stats for achievements
+      if (isAuthenticated) {
+        const stats = gameStatsRef.current;
+        submitAchievementsMutation.mutate({
+          dregKills: stats.dregKills || 0,
+          vandalKills: stats.vandalKills || 0,
+          captainKills: stats.captainKills || 0,
+          thrallKills: stats.thrallKills || 0,
+          acolyteKills: stats.acolyteKills || 0,
+          knightKills: stats.knightKills || 0,
+          goblinKills: stats.goblinKills || 0,
+          hobgoblinKills: stats.hobgoblinKills || 0,
+          minotaurKills: stats.minotaurKills || 0,
+          ogreKills: stats.ogreKills || 0,
+          servitorKills: stats.servitorKills || 0,
+          hydraKills: stats.hydraKills || 0,
+          flawlessOgre: stats.flawlessOgre || 0,
+          flawlessServitor: stats.flawlessServitor || 0,
+          flawlessHydra: stats.flawlessHydra || 0,
+          autoRifleKills: stats.autoRifleKills || 0,
+          handCannonKills: stats.handCannonKills || 0,
+          pulseRifleKills: stats.pulseRifleKills || 0,
+          rocketLauncherKills: stats.rocketLauncherKills || 0,
+          guardianClass: selectedClass,
+          score: gameState.score,
+          wave: gameState.wave,
+          level: gameState.level,
+          won: gameState.state === "victory",
+          commonEngrams: stats.commonEngrams || 0,
+          uncommonEngrams: stats.uncommonEngrams || 0,
+          rareEngrams: stats.rareEngrams || 0,
+          legendaryEngrams: stats.legendaryEngrams || 0,
+          exoticEngrams: stats.exoticEngrams || 0,
+          abilitiesUsed: stats.abilitiesUsed || 0,
+          supersUsed: stats.supersUsed || 0,
+          clearedCosmodrome: stats.clearedCosmodrome || false,
+          clearedEuropa: stats.clearedEuropa || false,
+          clearedDreamingCity: stats.clearedDreamingCity || false,
+        });
+      }
     }
-  }, [gameState.state, gameState.score, gameState.level, highScore, isAuthenticated, saveScoreMutation]);
+  }, [gameState.state, gameState.score, gameState.level, gameState.wave, highScore, isAuthenticated, saveScoreMutation, selectedClass, submitAchievementsMutation]);
 
   const startGame = () => {
     const guardian = guardianRef.current;
@@ -1414,6 +1557,20 @@ export default function Game() {
     powerupsRef.current = [];
     particlesRef.current = [];
     bossRef.current = null;
+    
+    // Reset game stats for achievements
+    gameStatsRef.current = {
+      dregKills: 0, vandalKills: 0, captainKills: 0,
+      thrallKills: 0, acolyteKills: 0, knightKills: 0,
+      goblinKills: 0, hobgoblinKills: 0, minotaurKills: 0,
+      ogreKills: 0, servitorKills: 0, hydraKills: 0,
+      flawlessOgre: 0, flawlessServitor: 0, flawlessHydra: 0,
+      autoRifleKills: 0, handCannonKills: 0, pulseRifleKills: 0, rocketLauncherKills: 0,
+      commonEngrams: 0, uncommonEngrams: 0, rareEngrams: 0, legendaryEngrams: 0, exoticEngrams: 0,
+      abilitiesUsed: 0, supersUsed: 0,
+      clearedCosmodrome: false, clearedEuropa: false, clearedDreamingCity: false,
+      bossHealthAtStart: 0,
+    };
 
     setGameState({
       state: "playing",
@@ -1693,6 +1850,33 @@ export default function Game() {
           </Card>
         </div>
       </main>
+
+      {/* Virtual Joystick for Mobile */}
+      {gameState.state === "playing" && (
+        <VirtualJoystick
+          onMove={(dx, dy) => {
+            touchMoveRef.current = { dx, dy };
+          }}
+          onFire={(firing) => {
+            touchFiringRef.current = firing;
+            mouseDownRef.current = firing;
+          }}
+          onAbility={activateAbility}
+          onSuper={() => {
+            if (guardianRef.current.superMeter >= 100) activateSuper();
+          }}
+          onWeaponSwitch={(index) => {
+            const weapons: WeaponType[] = ["autoRifle", "handCannon", "pulseRifle", "rocketLauncher"];
+            if (index === 3 && guardianRef.current.heavyAmmo <= 0) return;
+            guardianRef.current.weapon = weapons[index];
+          }}
+          disabled={gameState.state !== "playing"}
+          abilityCooldownPercent={Math.min(100, ((Date.now() - guardianRef.current.abilityCooldown) / GUARDIAN_CLASSES[guardianRef.current.class].abilityCooldown) * 100)}
+          superMeterPercent={guardianRef.current.superMeter}
+          currentWeapon={["autoRifle", "handCannon", "pulseRifle", "rocketLauncher"].indexOf(guardianRef.current.weapon)}
+          heavyAmmo={guardianRef.current.heavyAmmo}
+        />
+      )}
 
       {/* Lore Chatbot */}
       <LoreChatbot />

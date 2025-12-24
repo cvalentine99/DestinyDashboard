@@ -11,6 +11,7 @@ import Game from "./pages/Game";
 import Topology from "./pages/Topology";
 import Crucible from "./pages/Crucible";
 import BungieIntegration from "./pages/BungieIntegration";
+import Triumphs from "./pages/Triumphs";
 
 function Router() {
   return (
@@ -22,6 +23,7 @@ function Router() {
       <Route path="/game" component={Game} />
       <Route path="/crucible" component={Crucible} />
       <Route path="/bungie" component={BungieIntegration} />
+      <Route path="/triumphs" component={Triumphs} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>

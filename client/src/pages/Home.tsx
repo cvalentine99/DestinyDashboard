@@ -226,6 +226,15 @@ export default function Home() {
                 color="void"
               />
             </Link>
+            <Link href="/triumphs">
+              <FeatureCard
+                icon={<Trophy className="h-8 w-8" />}
+                title="Triumphs"
+                description="Track your legendary achievements in Engram Hunter. Earn titles, unlock rewards, and climb the triumph score leaderboard."
+                destinyTerm="Triumph Records"
+                color="arc"
+              />
+            </Link>
           </div>
         </div>
       </section>

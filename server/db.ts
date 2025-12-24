@@ -19,7 +19,10 @@ import {
   bungieServers, InsertBungieServer, BungieServer,
   bungieConfig, InsertBungieConfig, BungieConfig,
   bungieMatches, InsertBungieMatch, BungieMatch,
-  matchCorrelations, InsertMatchCorrelation, MatchCorrelation
+  matchCorrelations, InsertMatchCorrelation, MatchCorrelation,
+  userAchievements, InsertUserAchievement, UserAchievement,
+  userTriumphStats, InsertUserTriumphStats, UserTriumphStats,
+  achievementNotifications, InsertAchievementNotification, AchievementNotification
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -814,4 +817,217 @@ export async function getPerformanceInsights(userId: number) {
     neutralImpactCount: correlations.filter(c => c.performanceImpact === 'neutral').length,
     negativeImpactCount: correlations.filter(c => c.performanceImpact === 'negative').length,
   };
+}
+
+// ============================================================================
+// ACHIEVEMENTS DATABASE OPERATIONS
+// ============================================================================
+
+// Get or create user triumph stats
+export async function getOrCreateTriumphStats(userId: number): Promise<UserTriumphStats> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const existing = await db.select().from(userTriumphStats)
+    .where(eq(userTriumphStats.userId, userId)).limit(1);
+  
+  if (existing.length > 0) return existing[0];
+
+  // Create new stats record
+  await db.insert(userTriumphStats).values({ userId });
+  const created = await db.select().from(userTriumphStats)
+    .where(eq(userTriumphStats.userId, userId)).limit(1);
+  return created[0];
+}
+
+// Update triumph stats after a game
+export async function updateTriumphStats(
+  userId: number, 
+  updates: Partial<InsertUserTriumphStats>
+): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await getOrCreateTriumphStats(userId); // Ensure record exists
+  await db.update(userTriumphStats)
+    .set(updates)
+    .where(eq(userTriumphStats.userId, userId));
+}
+
+// Increment specific stat counters
+export async function incrementTriumphStat(
+  userId: number,
+  statKey: string,
+  amount: number = 1
+): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await getOrCreateTriumphStats(userId);
+  
+  // Use raw SQL for atomic increment
+  await db.execute(sql`
+    UPDATE user_triumph_stats 
+    SET ${sql.identifier(statKey)} = ${sql.identifier(statKey)} + ${amount}
+    WHERE userId = ${userId}
+  `);
+}
+
+// Get user's achievement progress
+export async function getUserAchievements(userId: number): Promise<UserAchievement[]> {
+  const db = await getDb();
+  if (!db) return [];
+
+  return db.select().from(userAchievements)
+    .where(eq(userAchievements.oderId, userId));
+}
+
+// Get or create achievement progress
+export async function getOrCreateAchievementProgress(
+  userId: number,
+  achievementId: string
+): Promise<UserAchievement> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const existing = await db.select().from(userAchievements)
+    .where(and(
+      eq(userAchievements.oderId, userId),
+      eq(userAchievements.achievementId, achievementId)
+    )).limit(1);
+  
+  if (existing.length > 0) return existing[0];
+
+  await db.insert(userAchievements).values({
+    oderId: userId,
+    achievementId,
+    currentValue: 0,
+    isCompleted: false,
+  });
+
+  const created = await db.select().from(userAchievements)
+    .where(and(
+      eq(userAchievements.oderId, userId),
+      eq(userAchievements.achievementId, achievementId)
+    )).limit(1);
+  return created[0];
+}
+
+// Update achievement progress
+export async function updateAchievementProgress(
+  userId: number,
+  achievementId: string,
+  currentValue: number,
+  isCompleted: boolean = false
+): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await getOrCreateAchievementProgress(userId, achievementId);
+  
+  const updateData: Partial<InsertUserAchievement> = {
+    currentValue,
+    isCompleted,
+  };
+  
+  if (isCompleted) {
+    updateData.completedAt = new Date();
+  }
+
+  await db.update(userAchievements)
+    .set(updateData)
+    .where(and(
+      eq(userAchievements.oderId, userId),
+      eq(userAchievements.achievementId, achievementId)
+    ));
+}
+
+// Mark achievement as completed
+export async function completeAchievement(
+  userId: number,
+  achievementId: string,
+  triumphPoints: number
+): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Update achievement
+  await db.update(userAchievements)
+    .set({
+      isCompleted: true,
+      completedAt: new Date(),
+    })
+    .where(and(
+      eq(userAchievements.oderId, userId),
+      eq(userAchievements.achievementId, achievementId)
+    ));
+
+  // Add triumph points
+  await db.execute(sql`
+    UPDATE user_triumph_stats 
+    SET totalTriumphPoints = totalTriumphPoints + ${triumphPoints}
+    WHERE userId = ${userId}
+  `);
+
+  // Create notification
+  await db.insert(achievementNotifications).values({
+    oderId: userId,
+    achievementId,
+    shown: false,
+  });
+}
+
+// Get pending achievement notifications
+export async function getPendingAchievementNotifications(
+  userId: number
+): Promise<AchievementNotification[]> {
+  const db = await getDb();
+  if (!db) return [];
+
+  return db.select().from(achievementNotifications)
+    .where(and(
+      eq(achievementNotifications.oderId, userId),
+      eq(achievementNotifications.shown, false)
+    ))
+    .orderBy(achievementNotifications.createdAt);
+}
+
+// Mark notification as shown
+export async function markNotificationShown(notificationId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+
+  await db.update(achievementNotifications)
+    .set({ shown: true })
+    .where(eq(achievementNotifications.id, notificationId));
+}
+
+// Get completed achievements count
+export async function getCompletedAchievementsCount(userId: number): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+
+  const result = await db.select({ count: sql<number>`count(*)` })
+    .from(userAchievements)
+    .where(and(
+      eq(userAchievements.oderId, userId),
+      eq(userAchievements.isCompleted, true)
+    ));
+  
+  return result[0]?.count || 0;
+}
+
+// Add title to user
+export async function addTitleToUser(userId: number, title: string): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+
+  const stats = await getOrCreateTriumphStats(userId);
+  const currentTitles = (stats.titlesEarned as string[]) || [];
+  
+  if (!currentTitles.includes(title)) {
+    await db.update(userTriumphStats)
+      .set({ titlesEarned: [...currentTitles, title] })
+      .where(eq(userTriumphStats.userId, userId));
+  }
 }

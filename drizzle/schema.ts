@@ -406,3 +406,130 @@ export const matchCorrelations = mysqlTable("match_correlations", {
 
 export type MatchCorrelation = typeof matchCorrelations.$inferSelect;
 export type InsertMatchCorrelation = typeof matchCorrelations.$inferInsert;
+
+// ============================================================================
+// TRIUMPH ACHIEVEMENTS SYSTEM
+// ============================================================================
+
+// Achievement Definitions (static data)
+export const achievementDefinitions = mysqlTable("achievement_definitions", {
+  id: varchar("id", { length: 64 }).primaryKey(), // e.g., "kill_100_thrall"
+  name: varchar("name", { length: 128 }).notNull(),
+  description: text("description").notNull(),
+  category: mysqlEnum("category", [
+    "combat",      // Kill-based achievements
+    "boss",        // Boss defeat achievements
+    "flawless",    // No-damage achievements
+    "score",       // Score milestone achievements
+    "class",       // Class mastery achievements
+    "weapon",      // Weapon mastery achievements
+    "survival",    // Wave/level survival achievements
+    "collection",  // Engram collection achievements
+    "special",     // Special/secret achievements
+  ]).notNull(),
+  tier: mysqlEnum("tier", ["bronze", "silver", "gold", "platinum", "exotic"]).notNull(),
+  targetValue: int("targetValue").notNull(), // e.g., 100 for "kill 100 thrall"
+  rewardType: mysqlEnum("rewardType", ["title", "emblem", "shader", "points"]).default("points"),
+  rewardValue: varchar("rewardValue", { length: 256 }), // Title name, emblem ID, etc.
+  triumphPoints: int("triumphPoints").default(10).notNull(),
+  iconUrl: varchar("iconUrl", { length: 512 }),
+  isSecret: boolean("isSecret").default(false).notNull(),
+  prerequisiteId: varchar("prerequisiteId", { length: 64 }), // Chain achievements
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type AchievementDefinition = typeof achievementDefinitions.$inferSelect;
+export type InsertAchievementDefinition = typeof achievementDefinitions.$inferInsert;
+
+// User Achievement Progress
+export const userAchievements = mysqlTable("user_achievements", {
+  id: int("id").autoincrement().primaryKey(),
+  oderId: int("userId").notNull(),
+  achievementId: varchar("achievementId", { length: 64 }).notNull(),
+  currentValue: int("currentValue").default(0).notNull(),
+  isCompleted: boolean("isCompleted").default(false).notNull(),
+  completedAt: timestamp("completedAt"),
+  claimedReward: boolean("claimedReward").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type UserAchievement = typeof userAchievements.$inferSelect;
+export type InsertUserAchievement = typeof userAchievements.$inferInsert;
+
+// User Triumph Stats (aggregate tracking)
+export const userTriumphStats = mysqlTable("user_triumph_stats", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().unique(),
+  // Kill tracking
+  totalKills: int("totalKills").default(0).notNull(),
+  dregKills: int("dregKills").default(0).notNull(),
+  vandalKills: int("vandalKills").default(0).notNull(),
+  captainKills: int("captainKills").default(0).notNull(),
+  thrallKills: int("thrallKills").default(0).notNull(),
+  acolyteKills: int("acolyteKills").default(0).notNull(),
+  knightKills: int("knightKills").default(0).notNull(),
+  goblinKills: int("goblinKills").default(0).notNull(),
+  hobgoblinKills: int("hobgoblinKills").default(0).notNull(),
+  minotaurKills: int("minotaurKills").default(0).notNull(),
+  // Boss tracking
+  ogreKills: int("ogreKills").default(0).notNull(),
+  servitorKills: int("servitorKills").default(0).notNull(),
+  hydraKills: int("hydraKills").default(0).notNull(),
+  flawlessOgre: int("flawlessOgre").default(0).notNull(),
+  flawlessServitor: int("flawlessServitor").default(0).notNull(),
+  flawlessHydra: int("flawlessHydra").default(0).notNull(),
+  // Weapon tracking
+  autoRifleKills: int("autoRifleKills").default(0).notNull(),
+  handCannonKills: int("handCannonKills").default(0).notNull(),
+  pulseRifleKills: int("pulseRifleKills").default(0).notNull(),
+  rocketLauncherKills: int("rocketLauncherKills").default(0).notNull(),
+  // Class tracking
+  titanGamesPlayed: int("titanGamesPlayed").default(0).notNull(),
+  hunterGamesPlayed: int("hunterGamesPlayed").default(0).notNull(),
+  warlockGamesPlayed: int("warlockGamesPlayed").default(0).notNull(),
+  titanWins: int("titanWins").default(0).notNull(),
+  hunterWins: int("hunterWins").default(0).notNull(),
+  warlockWins: int("warlockWins").default(0).notNull(),
+  // Score tracking
+  highestScore: int("highestScore").default(0).notNull(),
+  totalScore: bigint("totalScore", { mode: "number" }).default(0).notNull(),
+  gamesPlayed: int("gamesPlayed").default(0).notNull(),
+  // Level tracking
+  highestWave: int("highestWave").default(0).notNull(),
+  highestLevel: int("highestLevel").default(0).notNull(),
+  cosmodromeClears: int("cosmodromeClears").default(0).notNull(),
+  europaClears: int("europaClears").default(0).notNull(),
+  dreamingCityClears: int("dreamingCityClears").default(0).notNull(),
+  // Engram tracking
+  commonEngrams: int("commonEngrams").default(0).notNull(),
+  uncommonEngrams: int("uncommonEngrams").default(0).notNull(),
+  rareEngrams: int("rareEngrams").default(0).notNull(),
+  legendaryEngrams: int("legendaryEngrams").default(0).notNull(),
+  exoticEngrams: int("exoticEngrams").default(0).notNull(),
+  // Ability tracking
+  abilitiesUsed: int("abilitiesUsed").default(0).notNull(),
+  supersUsed: int("supersUsed").default(0).notNull(),
+  // Triumph points
+  totalTriumphPoints: int("totalTriumphPoints").default(0).notNull(),
+  // Titles earned
+  titlesEarned: json("titlesEarned").$type<string[]>(),
+  // Timestamps
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type UserTriumphStats = typeof userTriumphStats.$inferSelect;
+export type InsertUserTriumphStats = typeof userTriumphStats.$inferInsert;
+
+// Achievement Notification Queue (for showing popups)
+export const achievementNotifications = mysqlTable("achievement_notifications", {
+  id: int("id").autoincrement().primaryKey(),
+  oderId: int("userId").notNull(),
+  achievementId: varchar("achievementId", { length: 64 }).notNull(),
+  shown: boolean("shown").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type AchievementNotification = typeof achievementNotifications.$inferSelect;
+export type InsertAchievementNotification = typeof achievementNotifications.$inferInsert;

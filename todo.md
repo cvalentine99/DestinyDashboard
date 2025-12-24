@@ -184,3 +184,25 @@
 - [x] Daily/weekly/all-time rankings
 - [x] Player name display on scores
 - [x] Live score updates during gameplay
+
+## Mobile Touch Controls
+- [x] Virtual joystick component for movement (left side)
+- [x] Fire button overlay (right side)
+- [x] Ability button (Q) touch control
+- [x] Weapon switch buttons (1-4)
+- [x] Super activation button (Space)
+- [x] Touch event handling for multi-touch
+- [x] Responsive sizing for different mobile screens
+- [x] Hide touch controls on desktop
+
+## Triumph Achievements System
+- [x] Achievement data model and database schema
+- [x] Kill tracking achievements (Kill 100 Thrall, 50 Captains, etc.)
+- [x] Boss achievements (Defeat Phogoth, Sepiks, Argos)
+- [x] Flawless achievements (Defeat boss without damage)
+- [x] Score milestones (Reach 10K, 50K, 100K points)
+- [x] Class mastery achievements (Complete level with each class)
+- [x] Weapon mastery achievements (Get 100 kills with each weapon)
+- [x] Achievement notification popups
+- [x] Triumphs page with progress tracking
+- [x] Achievement rewards (unlock cosmetics, titles)
