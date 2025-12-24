@@ -381,6 +381,24 @@ export default function Crucible() {
     { enabled: !!activeMatchId, refetchInterval: 2000 }
   );
 
+  // Real-time 1-second metrics from ExtraHop (when device is selected)
+  const { data: realtimeMetrics } = trpc.crucible.getRealtimeDeviceMetrics.useQuery(
+    { deviceId: selectedDevice?.id },
+    { 
+      enabled: !!selectedDevice?.id && !!config,
+      refetchInterval: 1000, // 1-second polling for real-time data
+    }
+  );
+
+  // Real-time peer connections
+  const { data: realtimePeers } = trpc.crucible.getRealtimePeers.useQuery(
+    { deviceId: selectedDevice?.id },
+    {
+      enabled: !!selectedDevice?.id && !!config,
+      refetchInterval: 5000, // 5-second polling for peer updates
+    }
+  );
+
   // Mutations
   const startMatchMutation = trpc.crucible.startMatch.useMutation({
     onSuccess: (data) => {
@@ -396,6 +414,56 @@ export default function Crucible() {
     onSuccess: () => {
       setActiveMatchId(null);
       toast.success("Match monitoring ended");
+    },
+  });
+
+  // PCAP Download mutations
+  const downloadPcapMutation = trpc.crucible.downloadPcap.useMutation({
+    onSuccess: (data) => {
+      if (data.success) {
+        // Convert base64 to blob and download
+        const byteCharacters = atob(data.data);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: "application/vnd.tcpdump.pcap" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = data.filename;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.success(`PCAP downloaded: ${(data.sizeBytes / 1024 / 1024).toFixed(2)} MB`);
+      }
+    },
+    onError: (error) => {
+      toast.error(`PCAP download failed: ${error.message}`);
+    },
+  });
+
+  const downloadMatchPcapMutation = trpc.crucible.downloadMatchPcap.useMutation({
+    onSuccess: (data) => {
+      if (data.success) {
+        const byteCharacters = atob(data.data);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: "application/vnd.tcpdump.pcap" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = data.filename;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.success(`Match PCAP downloaded: ${(data.sizeBytes / 1024 / 1024).toFixed(2)} MB`);
+      }
+    },
+    onError: (error) => {
+      toast.error(`Match PCAP download failed: ${error.message}`);
     },
   });
 
@@ -633,21 +701,80 @@ export default function Crucible() {
 
           {/* Live Monitor Tab */}
           <TabsContent value="live" className="space-y-6">
+            {/* Real-time ExtraHop Metrics Banner */}
+            {realtimeMetrics?.connectionQuality && (
+              <Card className="bg-gradient-to-r from-primary/20 to-amber-500/20 border-primary/50">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="h-3 w-3 rounded-full bg-green-400 animate-pulse" />
+                      <span className="text-sm font-medium">LIVE EXTRAHOP DATA • 1-SECOND POLLING</span>
+                    </div>
+                    <ConnectionQualityIndicator 
+                      rating={realtimeMetrics.connectionQuality.rating}
+                      score={realtimeMetrics.connectionQuality.score}
+                      destinyTerm={realtimeMetrics.connectionQuality.destinyTerm}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Latency Chart */}
+              {/* Real-time Latency Chart from ExtraHop */}
               <Card className="bg-card/50 backdrop-blur border-border">
                 <CardHeader>
                   <CardTitle className="text-sm flex items-center gap-2">
                     <Activity className="h-4 w-4 text-primary" />
-                    Connection Metrics
+                    Real-Time Connection Metrics
+                    <Badge variant="outline" className="ml-auto text-xs">
+                      1s polling
+                    </Badge>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {liveMetrics?.metrics?.length ? (
+                  {realtimeMetrics?.dataPoints?.length ? (
+                    <ResponsiveContainer width="100%" height={200}>
+                      <AreaChart data={realtimeMetrics.dataPoints.slice(-30)}>
+                        <defs>
+                          <linearGradient id="latencyGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
+                            <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                          </linearGradient>
+                          <linearGradient id="jitterGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3}/>
+                            <stop offset="95%" stopColor="#f59e0b" stopOpacity={0}/>
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                        <XAxis 
+                          dataKey="timestamp" 
+                          tickFormatter={(t) => new Date(t).toLocaleTimeString()}
+                          stroke="hsl(var(--muted-foreground))"
+                          tick={{ fontSize: 10 }}
+                        />
+                        <YAxis stroke="hsl(var(--muted-foreground))" tick={{ fontSize: 10 }} />
+                        <Area 
+                          type="monotone" 
+                          dataKey="latencyMs" 
+                          stroke="hsl(var(--primary))" 
+                          fill="url(#latencyGradient)"
+                          strokeWidth={2}
+                        />
+                        <Area 
+                          type="monotone" 
+                          dataKey="jitterMs" 
+                          stroke="#f59e0b" 
+                          fill="url(#jitterGradient)"
+                          strokeWidth={2}
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  ) : liveMetrics?.metrics?.length ? (
                     <LiveMetricsChart metrics={liveMetrics.metrics} />
                   ) : (
                     <div className="h-[200px] flex items-center justify-center text-muted-foreground">
-                      <p>Start a match to see live metrics</p>
+                      <p>{selectedDevice ? "Connecting to ExtraHop..." : "Select a device to see live metrics"}</p>
                     </div>
                   )}
                   <div className="flex items-center justify-center gap-6 mt-4 text-xs">
@@ -663,16 +790,70 @@ export default function Crucible() {
                 </CardContent>
               </Card>
 
-              {/* Current Stats */}
+              {/* Current Stats from ExtraHop */}
               <Card className="bg-card/50 backdrop-blur border-border">
                 <CardHeader>
                   <CardTitle className="text-sm flex items-center gap-2">
                     <Monitor className="h-4 w-4 text-primary" />
-                    Current Session
+                    Live Session Stats
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {liveMetrics?.metrics?.[0] ? (
+                  {realtimeMetrics?.dataPoints?.length ? (
+                    <>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-xs text-muted-foreground">LATENCY (RTT)</p>
+                          <p className="text-2xl font-mono font-bold text-primary">
+                            {realtimeMetrics.dataPoints[realtimeMetrics.dataPoints.length - 1]?.latencyMs?.toFixed(1) || 0} ms
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">JITTER</p>
+                          <p className="text-2xl font-mono font-bold text-amber-400">
+                            {realtimeMetrics.dataPoints[realtimeMetrics.dataPoints.length - 1]?.jitterMs?.toFixed(1) || 0} ms
+                          </p>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-xs text-muted-foreground">PACKET LOSS</p>
+                          <p className="text-lg font-mono text-red-400">
+                            {realtimeMetrics.dataPoints[realtimeMetrics.dataPoints.length - 1]?.packetLoss?.toFixed(2) || 0}%
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">RETRANSMITS</p>
+                          <p className="text-lg font-mono text-orange-400">
+                            {realtimeMetrics.dataPoints[realtimeMetrics.dataPoints.length - 1]?.retransmits || 0}
+                          </p>
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-2">THROUGHPUT (Last Second)</p>
+                        <div className="flex items-center gap-4">
+                          <div className="flex-1">
+                            <p className="text-xs text-muted-foreground">↑ Out</p>
+                            <p className="font-mono">
+                              {((realtimeMetrics.dataPoints[realtimeMetrics.dataPoints.length - 1]?.bytesOut || 0) / 1024).toFixed(1)} KB/s
+                            </p>
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-xs text-muted-foreground">↓ In</p>
+                            <p className="font-mono">
+                              {((realtimeMetrics.dataPoints[realtimeMetrics.dataPoints.length - 1]?.bytesIn || 0) / 1024).toFixed(1)} KB/s
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="pt-2 border-t border-border">
+                        <p className="text-xs text-muted-foreground mb-2">CONNECTED PEERS</p>
+                        <p className="text-lg font-mono text-teal-400">
+                          {realtimePeers?.peers?.length || 0} Guardians
+                        </p>
+                      </div>
+                    </>
+                  ) : liveMetrics?.metrics?.[0] ? (
                     <>
                       <div className="grid grid-cols-2 gap-4">
                         <div>
@@ -688,46 +869,53 @@ export default function Crucible() {
                           </p>
                         </div>
                       </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <p className="text-xs text-muted-foreground">PACKETS SENT</p>
-                          <p className="text-lg font-mono">
-                            {liveMetrics.metrics[0].packetsSent?.toLocaleString() || 0}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">PACKETS LOST</p>
-                          <p className="text-lg font-mono text-red-400">
-                            {liveMetrics.metrics[0].packetsLost || 0}
-                          </p>
-                        </div>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-2">DATA TRANSFERRED</p>
-                        <div className="flex items-center gap-4">
-                          <div className="flex-1">
-                            <p className="text-xs text-muted-foreground">↑ Sent</p>
-                            <p className="font-mono">
-                              {((liveMetrics.metrics[0].bytesSent || 0) / 1024 / 1024).toFixed(2)} MB
-                            </p>
-                          </div>
-                          <div className="flex-1">
-                            <p className="text-xs text-muted-foreground">↓ Received</p>
-                            <p className="font-mono">
-                              {((liveMetrics.metrics[0].bytesReceived || 0) / 1024 / 1024).toFixed(2)} MB
-                            </p>
-                          </div>
-                        </div>
-                      </div>
                     </>
                   ) : (
                     <div className="h-[200px] flex items-center justify-center text-muted-foreground">
-                      <p>No active session data</p>
+                      <p>{selectedDevice ? "Waiting for data..." : "Select a device first"}</p>
                     </div>
                   )}
                 </CardContent>
               </Card>
             </div>
+
+            {/* PCAP Download Section */}
+            {selectedDevice?.ipaddr4 && (
+              <Card className="bg-card/50 backdrop-blur border-border">
+                <CardHeader>
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Zap className="h-4 w-4 text-amber-400" />
+                    Packet Capture (PCAP)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center gap-4">
+                    <p className="text-sm text-muted-foreground flex-1">
+                      Download packet capture for post-game analysis. Captures all traffic to/from your PS5.
+                    </p>
+                    <Button
+                      variant="outline"
+                      className="border-amber-400/50 text-amber-400 hover:bg-amber-400/10"
+                      onClick={() => {
+                        downloadPcapMutation.mutate({
+                          deviceIp: selectedDevice.ipaddr4,
+                          fromMs: Date.now() - 300000, // Last 5 minutes
+                          untilMs: Date.now(),
+                        });
+                      }}
+                      disabled={downloadPcapMutation.isPending}
+                    >
+                      {downloadPcapMutation.isPending ? (
+                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Zap className="h-4 w-4 mr-2" />
+                      )}
+                      Download Last 5 Min
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           {/* Peer Analysis Tab */}
@@ -820,13 +1008,33 @@ export default function Crucible() {
                             </p>
                           </div>
                         </div>
-                        <div className="text-right">
-                          <p className="font-mono text-sm">
-                            {match.avgLatencyMs || "—"} ms avg
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {match.peerCount || 0} peers
-                          </p>
+                        <div className="flex items-center gap-4">
+                          <div className="text-right">
+                            <p className="font-mono text-sm">
+                              {match.avgLatencyMs || "—"} ms avg
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {match.peerCount || 0} peers
+                            </p>
+                          </div>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-amber-400 hover:bg-amber-400/10"
+                                onClick={() => downloadMatchPcapMutation.mutate({ matchId: match.id })}
+                                disabled={downloadMatchPcapMutation.isPending}
+                              >
+                                {downloadMatchPcapMutation.isPending ? (
+                                  <RefreshCw className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Zap className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Download PCAP</TooltipContent>
+                          </Tooltip>
                         </div>
                       </div>
                     ))}

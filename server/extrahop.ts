@@ -478,6 +478,75 @@ export class ExtrahopClient {
     });
   }
 
+  // ============ PACKETS ENDPOINTS ============
+
+  /**
+   * POST /packets/search - Search for packets and download PCAP
+   * Returns packet data that can be downloaded as PCAP file
+   */
+  async searchPackets(params: {
+    from: number | string;
+    until?: number | string;
+    limit_bytes?: number;
+    limit_search_duration?: number;
+    always_return_body?: boolean;
+    bpf?: string;
+    ip1?: string;
+    ip2?: string;
+    port1?: number;
+    port2?: number;
+    output?: "pcap" | "keylog_txt" | "pcapng" | "zip";
+  }): Promise<ArrayBuffer> {
+    const response = await this.client.post("/packets/search", params, {
+      responseType: "arraybuffer",
+      headers: {
+        Accept: "application/vnd.tcpdump.pcap",
+      },
+    });
+    return response.data;
+  }
+
+  /**
+   * Download PCAP for a specific device during a time range
+   * Useful for capturing Crucible match traffic
+   */
+  async downloadDevicePcap(deviceIp: string, fromMs: number, untilMs: number = 0, limitBytes: number = 100000000): Promise<ArrayBuffer> {
+    return this.searchPackets({
+      from: fromMs,
+      until: untilMs,
+      ip1: deviceIp,
+      limit_bytes: limitBytes, // 100MB default
+      output: "pcap",
+    });
+  }
+
+  /**
+   * Download PCAP for traffic between two IPs (e.g., PS5 and peer)
+   */
+  async downloadPeerPcap(ip1: string, ip2: string, fromMs: number, untilMs: number = 0): Promise<ArrayBuffer> {
+    return this.searchPackets({
+      from: fromMs,
+      until: untilMs,
+      ip1,
+      ip2,
+      limit_bytes: 50000000, // 50MB
+      output: "pcap",
+    });
+  }
+
+  /**
+   * Download PCAP with BPF filter for advanced filtering
+   */
+  async downloadFilteredPcap(bpfFilter: string, fromMs: number, untilMs: number = 0): Promise<ArrayBuffer> {
+    return this.searchPackets({
+      from: fromMs,
+      until: untilMs,
+      bpf: bpfFilter,
+      limit_bytes: 100000000,
+      output: "pcap",
+    });
+  }
+
   // ============ ALERTS ENDPOINTS ============
 
   /**

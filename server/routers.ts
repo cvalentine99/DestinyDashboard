@@ -949,6 +949,278 @@ const crucibleRouter = router({
         input.jitterMs
       );
     }),
+
+  // ============ REAL-TIME METRICS (1-second polling) ============
+
+  // Get real-time 1-second metrics for a device from ExtraHop
+  getRealtimeDeviceMetrics: protectedProcedure
+    .input(z.object({
+      deviceId: z.number(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const config = await db.getExtrahopConfigByUser(ctx.user.id);
+      if (!config) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "ExtraHop not configured" });
+      }
+
+      try {
+        const client = new ExtrahopClient({ apiUrl: config.apiUrl, apiKey: config.apiKey });
+        
+        // Get 1-second granularity metrics
+        const metrics = await client.queryMetrics({
+          cycle: "1sec",
+          from: -30000, // Last 30 seconds
+          until: 0,
+          metric_category: "net",
+          object_type: "device",
+          object_ids: [input.deviceId],
+          metric_specs: [
+            { name: "bytes_in" },
+            { name: "bytes_out" },
+            { name: "pkts_in" },
+            { name: "pkts_out" },
+            { name: "rto_in" },
+            { name: "rto_out" },
+          ],
+        });
+
+        // Get TCP metrics for latency
+        const tcpMetrics = await client.queryMetrics({
+          cycle: "1sec",
+          from: -30000,
+          until: 0,
+          metric_category: "tcp",
+          object_type: "device",
+          object_ids: [input.deviceId],
+          metric_specs: [
+            { name: "rtt" },
+            { name: "retrans_out" },
+          ],
+        });
+
+        // Parse and combine metrics
+        const dataPoints: any[] = [];
+        const stats = metrics.stats || [];
+        const tcpStats = tcpMetrics.stats || [];
+
+        for (let i = 0; i < stats.length; i++) {
+          const netStat = stats[i];
+          const tcpStat = tcpStats[i];
+          
+          if (netStat?.values) {
+            const timestamp = netStat.time;
+            const bytesIn = netStat.values[0]?.[0] || 0;
+            const bytesOut = netStat.values[1]?.[0] || 0;
+            const pktsIn = netStat.values[2]?.[0] || 0;
+            const pktsOut = netStat.values[3]?.[0] || 0;
+            const rtoIn = netStat.values[4]?.[0] || 0;
+            const rtoOut = netStat.values[5]?.[0] || 0;
+            
+            const rtt = tcpStat?.values?.[0]?.[0] || 0;
+            const retrans = tcpStat?.values?.[1]?.[0] || 0;
+
+            // Calculate jitter from RTT variance
+            const jitter = i > 0 && dataPoints[i-1]?.rtt 
+              ? Math.abs(rtt - dataPoints[i-1].rtt) 
+              : 0;
+
+            dataPoints.push({
+              timestamp,
+              bytesIn,
+              bytesOut,
+              pktsIn,
+              pktsOut,
+              rtoIn,
+              rtoOut,
+              latencyMs: rtt,
+              jitterMs: jitter,
+              retransmits: retrans,
+              packetLoss: pktsOut > 0 ? (retrans / pktsOut) * 100 : 0,
+            });
+          }
+        }
+
+        // Calculate current connection quality from latest data
+        const latest = dataPoints[dataPoints.length - 1];
+        let connectionQuality = null;
+        if (latest) {
+          connectionQuality = crucible.rateConnectionQuality(
+            latest.latencyMs || 0,
+            latest.packetLoss || 0,
+            latest.jitterMs || 0
+          );
+        }
+
+        return {
+          dataPoints,
+          connectionQuality,
+          timestamp: Date.now(),
+        };
+      } catch (error: any) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+      }
+    }),
+
+  // Get peer connections in real-time
+  getRealtimePeers: protectedProcedure
+    .input(z.object({
+      deviceId: z.number(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const config = await db.getExtrahopConfigByUser(ctx.user.id);
+      if (!config) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "ExtraHop not configured" });
+      }
+
+      try {
+        const client = new ExtrahopClient({ apiUrl: config.apiUrl, apiKey: config.apiKey });
+        
+        // Get topology to find peers
+        const topology = await client.getDeviceTopology(input.deviceId, -60000);
+        
+        // Get flow records for more detail
+        const flows = await client.getDevicePeerRecords(input.deviceId, -60000);
+
+        return {
+          peers: topology.nodes.filter(n => n.id !== input.deviceId),
+          edges: topology.edges,
+          flowCount: flows?.records?.length || 0,
+          timestamp: Date.now(),
+        };
+      } catch (error: any) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+      }
+    }),
+
+  // ============ PCAP DOWNLOAD ============
+
+  // Download PCAP for a device during a time range
+  downloadPcap: protectedProcedure
+    .input(z.object({
+      deviceIp: z.string(),
+      fromMs: z.number(),
+      untilMs: z.number().optional(),
+      limitBytes: z.number().optional().default(100000000), // 100MB default
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const config = await db.getExtrahopConfigByUser(ctx.user.id);
+      if (!config) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "ExtraHop not configured" });
+      }
+
+      try {
+        const client = new ExtrahopClient({ apiUrl: config.apiUrl, apiKey: config.apiKey });
+        
+        const pcapData = await client.downloadDevicePcap(
+          input.deviceIp,
+          input.fromMs,
+          input.untilMs || 0,
+          input.limitBytes
+        );
+
+        // Convert ArrayBuffer to base64 for transport
+        const base64 = Buffer.from(pcapData).toString("base64");
+        const filename = `crucible_${input.deviceIp.replace(/\./g, "_")}_${Date.now()}.pcap`;
+
+        return {
+          success: true,
+          filename,
+          data: base64,
+          sizeBytes: pcapData.byteLength,
+        };
+      } catch (error: any) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+      }
+    }),
+
+  // Download PCAP for a specific match
+  downloadMatchPcap: protectedProcedure
+    .input(z.object({
+      matchId: z.number(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const config = await db.getExtrahopConfigByUser(ctx.user.id);
+      if (!config) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "ExtraHop not configured" });
+      }
+
+      // Get match details
+      const match = await db.getCrucibleMatchById(input.matchId);
+      if (!match) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Match not found" });
+      }
+
+      // Get the device to find IP
+      const device = await db.getCrucibleDeviceById(match.deviceId);
+      if (!device?.ipAddress) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Device IP address not available" });
+      }
+
+      try {
+        const client = new ExtrahopClient({ apiUrl: config.apiUrl, apiKey: config.apiKey });
+        
+        const fromMs = match.startTime ? match.startTime.getTime() : Date.now() - 3600000;
+        const untilMs = match.endTime ? match.endTime.getTime() : 0;
+
+        const pcapData = await client.downloadDevicePcap(
+          device.ipAddress,
+          fromMs,
+          untilMs,
+          100000000 // 100MB limit
+        );
+
+        const base64 = Buffer.from(pcapData).toString("base64");
+        const filename = `crucible_match_${input.matchId}_${match.gameMode || "unknown"}.pcap`;
+
+        return {
+          success: true,
+          filename,
+          data: base64,
+          sizeBytes: pcapData.byteLength,
+          matchDuration: match.durationMs ? Number(match.durationMs) : null,
+        };
+      } catch (error: any) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+      }
+    }),
+
+  // Download PCAP for peer-to-peer traffic
+  downloadPeerPcap: protectedProcedure
+    .input(z.object({
+      deviceIp: z.string(),
+      peerIp: z.string(),
+      fromMs: z.number(),
+      untilMs: z.number().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const config = await db.getExtrahopConfigByUser(ctx.user.id);
+      if (!config) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "ExtraHop not configured" });
+      }
+
+      try {
+        const client = new ExtrahopClient({ apiUrl: config.apiUrl, apiKey: config.apiKey });
+        
+        const pcapData = await client.downloadPeerPcap(
+          input.deviceIp,
+          input.peerIp,
+          input.fromMs,
+          input.untilMs || 0
+        );
+
+        const base64 = Buffer.from(pcapData).toString("base64");
+        const filename = `crucible_p2p_${input.deviceIp.replace(/\./g, "_")}_${input.peerIp.replace(/\./g, "_")}_${Date.now()}.pcap`;
+
+        return {
+          success: true,
+          filename,
+          data: base64,
+          sizeBytes: pcapData.byteLength,
+        };
+      } catch (error: any) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+      }
+    }),
 });
 
 export const appRouter = router({

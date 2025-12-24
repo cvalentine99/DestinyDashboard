@@ -85,3 +85,12 @@
 - [x] Use /records/search for flow records and connection data
 - [x] Use /activitymaps/query for peer topology
 - [x] Remove all simulated/fake data generation
+
+## Real-time Metric Polling & PCAP Download
+- [x] Implement 1-second polling for live metrics during Crucible matches
+- [x] Add real-time latency/jitter/packet loss graphs with 1-second updates
+- [x] Create getRealtimeDeviceMetrics and getRealtimePeers endpoints
+- [x] Add PCAP download feature using /packets/search endpoint
+- [x] Build PCAP capture UI with time range selection (last 5 min button)
+- [x] Add downloadPcap and downloadMatchPcap mutations
+- [x] Add download button to post-game match review
