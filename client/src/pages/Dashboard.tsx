@@ -23,7 +23,13 @@ import {
   TrendingDown,
   Clock,
   Eye,
-  Gamepad2
+  Gamepad2,
+  Menu,
+  X,
+  Home,
+  Target,
+  Map,
+  Crosshair
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import LoreChatbot from "@/components/LoreChatbot";
@@ -39,7 +45,9 @@ const TricornLogo = () => (
 export default function Dashboard() {
   const { user, loading: authLoading, isAuthenticated } = useAuth();
   const [, setLocation] = useLocation();
+  const [location] = useLocation();
   const [statusMessages, setStatusMessages] = useState<string[]>([]);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Fetch dashboard data
   const { data: dashboardData, isLoading, refetch } = trpc.extrahop.getDashboardSummary.useQuery(
@@ -103,23 +111,63 @@ export default function Dashboard() {
             </Link>
             
             <div className="hidden md:flex items-center gap-1">
-              <NavLink href="/dashboard" active>Command Center</NavLink>
-              <NavLink href="/topology">Topology</NavLink>
-              <NavLink href="/game">Mini-Game</NavLink>
-              <NavLink href="/settings">Settings</NavLink>
+              <NavLink href="/dashboard" active={location === "/dashboard"}>Command Center</NavLink>
+              <NavLink href="/crucible" active={location === "/crucible"}>Crucible Ops</NavLink>
+              <NavLink href="/topology" active={location === "/topology"}>Topology</NavLink>
+              <NavLink href="/game" active={location === "/game"}>Mini-Game</NavLink>
+              <NavLink href="/settings" active={location === "/settings"}>Settings</NavLink>
             </div>
+            
+            {/* Mobile Menu Button */}
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="md:hidden"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            >
+              {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </Button>
           </div>
           
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="sm" onClick={() => refetch()}>
+            <Button variant="ghost" size="sm" onClick={() => refetch()} className="hidden sm:flex">
               <RefreshCw className="h-4 w-4" />
             </Button>
-            <span className="text-sm text-muted-foreground">
+            <span className="text-sm text-muted-foreground hidden sm:block">
               <span className="text-primary">{user?.name || "Guardian"}</span>
             </span>
           </div>
         </div>
       </nav>
+
+      {/* Mobile Navigation Menu */}
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 z-40 md:hidden">
+          <div className="fixed inset-0 bg-background/80 backdrop-blur-sm" onClick={() => setMobileMenuOpen(false)} />
+          <nav className="fixed top-14 left-0 right-0 bg-card border-b border-border p-4 space-y-2">
+            <MobileNavLink href="/dashboard" icon={<Shield className="h-4 w-4" />} active={location === "/dashboard"} onClick={() => setMobileMenuOpen(false)}>
+              Command Center
+            </MobileNavLink>
+            <MobileNavLink href="/crucible" icon={<Crosshair className="h-4 w-4" />} active={location === "/crucible"} onClick={() => setMobileMenuOpen(false)}>
+              Crucible Ops
+            </MobileNavLink>
+            <MobileNavLink href="/topology" icon={<Map className="h-4 w-4" />} active={location === "/topology"} onClick={() => setMobileMenuOpen(false)}>
+              Topology
+            </MobileNavLink>
+            <MobileNavLink href="/game" icon={<Gamepad2 className="h-4 w-4" />} active={location === "/game"} onClick={() => setMobileMenuOpen(false)}>
+              Mini-Game
+            </MobileNavLink>
+            <MobileNavLink href="/settings" icon={<Settings className="h-4 w-4" />} active={location === "/settings"} onClick={() => setMobileMenuOpen(false)}>
+              Settings
+            </MobileNavLink>
+            <div className="pt-2 border-t border-border">
+              <div className="text-xs text-muted-foreground px-3 py-2">
+                Logged in as <span className="text-primary">{user?.name || "Guardian"}</span>
+              </div>
+            </div>
+          </nav>
+        </div>
+      )}
 
       {/* Status Ticker */}
       <div className="fixed top-14 left-0 right-0 z-40 bg-card/80 backdrop-blur-sm border-b border-border py-1 overflow-hidden">
@@ -370,6 +418,58 @@ function NavLink({ href, children, active }: { href: string; children: React.Rea
         {children}
       </Button>
     </Link>
+  );
+}
+
+// Mobile Navigation Link Component
+function MobileNavLink({ 
+  href, 
+  children, 
+  icon, 
+  active,
+  onClick 
+}: { 
+  href: string; 
+  children: React.ReactNode; 
+  icon: React.ReactNode;
+  active?: boolean;
+  onClick?: () => void;
+}) {
+  return (
+    <Link href={href} onClick={onClick}>
+      <div className={`flex items-center gap-3 px-3 py-3 rounded-lg transition-colors ${
+        active 
+          ? 'bg-primary/10 text-primary' 
+          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+      }`}>
+        {icon}
+        <span className="text-sm font-medium tracking-wider">{children}</span>
+        {active && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-primary" />}
+      </div>
+    </Link>
+  );
+}
+
+// Breadcrumb Component
+function Breadcrumbs({ items }: { items: { label: string; href?: string }[] }) {
+  return (
+    <nav className="flex items-center gap-2 text-xs text-muted-foreground mb-4">
+      <Link href="/" className="hover:text-foreground transition-colors">
+        <Home className="h-3.5 w-3.5" />
+      </Link>
+      {items.map((item, i) => (
+        <div key={i} className="flex items-center gap-2">
+          <ChevronRight className="h-3 w-3" />
+          {item.href ? (
+            <Link href={item.href} className="hover:text-foreground transition-colors">
+              {item.label}
+            </Link>
+          ) : (
+            <span className="text-foreground">{item.label}</span>
+          )}
+        </div>
+      ))}
+    </nav>
   );
 }
 

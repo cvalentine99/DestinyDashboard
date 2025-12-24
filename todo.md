@@ -251,3 +251,14 @@
 - [x] K/D ratio and ping stats per match type
 - [x] Net Deaths indicator with skull icons
 - [x] Dark surveillance dashboard aesthetic with cyan/red accent colors
+
+## Bug Fixes
+- [x] Fix broken dashboard link in Crucible Operations Center (was working correctly)
+
+## Navigation Improvements
+- [x] Add Crucible link to dashboard top navigation
+- [x] Implement breadcrumbs component for navigation flow
+- [x] Optimize navigation for mobile responsiveness
+- [x] Add hamburger menu for mobile view with slide-out menu
+- [x] Hide username and refresh button on small screens
+- [x] Active state highlighting for current page
