@@ -36,6 +36,13 @@
       "when": 1766610022642,
       "tag": "0004_stale_zaran",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1766610920481,
+      "tag": "0005_petite_khan",
+      "breakpoints": true
     }
   ]
 }

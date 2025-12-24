@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import LoreChatbot from "@/components/LoreChatbot";
 import VirtualJoystick from "@/components/VirtualJoystick";
+import LoadoutSelector from "@/components/LoadoutSelector";
 
 // ============================================================================
 // GAME CONSTANTS
@@ -353,6 +354,7 @@ export default function Game() {
   });
   
   const [selectedClass, setSelectedClass] = useState<GuardianClass>("hunter");
+  const [selectedWeapon, setSelectedWeapon] = useState<WeaponType>("autoRifle");
   const [highScore, setHighScore] = useState(0);
   const idCounterRef = useRef(0);
   
@@ -1545,7 +1547,7 @@ export default function Game() {
     guardian.shield = 0;
     guardian.superMeter = 0;
     guardian.class = selectedClass;
-    guardian.weapon = "autoRifle";
+    guardian.weapon = selectedWeapon;
     guardian.abilityCooldown = 0;
     guardian.abilityActive = false;
     guardian.invincible = false;
@@ -1629,55 +1631,17 @@ export default function Game() {
             <div className="relative w-full h-full rounded-lg overflow-hidden border border-border bg-card">
               <canvas ref={canvasRef} className="w-full h-full cursor-crosshair" />
               
-              {/* Class Selection Overlay */}
+              {/* Loadout Selection Overlay */}
               {gameState.state === "idle" && (
-                <div className="absolute inset-0 bg-background/90 backdrop-blur-sm flex items-center justify-center">
-                  <Card className="destiny-card w-[500px]">
-                    <CardHeader className="text-center">
-                      <CardTitle className="text-3xl text-secondary">ENGRAM HUNTER</CardTitle>
-                      <CardDescription className="text-lg">COMBAT EDITION</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                      <div className="text-center text-sm text-muted-foreground">
-                        Choose your Guardian class
-                      </div>
-                      
-                      <div className="grid grid-cols-3 gap-3">
-                        {(Object.entries(GUARDIAN_CLASSES) as [GuardianClass, typeof GUARDIAN_CLASSES[GuardianClass]][]).map(([key, data]) => (
-                          <button
-                            key={key}
-                            onClick={() => setSelectedClass(key)}
-                            className={`p-4 rounded-lg border-2 transition-all ${
-                              selectedClass === key 
-                                ? "border-secondary bg-secondary/20" 
-                                : "border-border hover:border-secondary/50"
-                            }`}
-                          >
-                            <div 
-                              className="w-12 h-12 mx-auto mb-2 rounded-full"
-                              style={{ backgroundColor: data.color }}
-                            />
-                            <div className="font-bold">{data.name}</div>
-                            <div className="text-xs text-muted-foreground mt-1">
-                              {data.ability}
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-
-                      <Button onClick={startGame} className="w-full bg-primary hover:bg-primary/90" size="lg">
-                        <Play className="h-5 w-5 mr-2" />
-                        START MISSION
-                      </Button>
-
-                      <div className="text-xs text-muted-foreground space-y-1 pt-4 border-t border-border">
-                        <p className="font-medium text-foreground">Controls:</p>
-                        <p>• Mouse: Move & Aim | Click: Fire</p>
-                        <p>• SPACE: Class Ability | Q: Super (when charged)</p>
-                        <p>• 1-4: Switch Weapons</p>
-                      </div>
-                    </CardContent>
-                  </Card>
+                <div className="absolute inset-0 bg-background/90 backdrop-blur-sm flex items-center justify-center p-4">
+                  <LoadoutSelector
+                    selectedClass={selectedClass}
+                    selectedWeapon={selectedWeapon}
+                    onSelectClass={setSelectedClass}
+                    onSelectWeapon={setSelectedWeapon}
+                    onStartGame={startGame}
+                    isAuthenticated={isAuthenticated}
+                  />
                 </div>
               )}
 

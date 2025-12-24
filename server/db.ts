@@ -22,7 +22,8 @@ import {
   matchCorrelations, InsertMatchCorrelation, MatchCorrelation,
   userAchievements, InsertUserAchievement, UserAchievement,
   userTriumphStats, InsertUserTriumphStats, UserTriumphStats,
-  achievementNotifications, InsertAchievementNotification, AchievementNotification
+  achievementNotifications, InsertAchievementNotification, AchievementNotification,
+  guardianLoadouts, InsertGuardianLoadout, GuardianLoadout
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
@@ -1030,4 +1031,119 @@ export async function addTitleToUser(userId: number, title: string): Promise<voi
       .set({ titlesEarned: [...currentTitles, title] })
       .where(eq(userTriumphStats.userId, userId));
   }
+}
+
+
+// ============================================================================
+// LOADOUT OPERATIONS
+// ============================================================================
+
+export async function createLoadout(loadout: InsertGuardianLoadout): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const result = await db.insert(guardianLoadouts).values(loadout);
+  return result[0].insertId;
+}
+
+export async function getUserLoadouts(userId: number): Promise<GuardianLoadout[]> {
+  const db = await getDb();
+  if (!db) return [];
+  
+  return db.select().from(guardianLoadouts)
+    .where(eq(guardianLoadouts.userId, userId))
+    .orderBy(guardianLoadouts.slotNumber);
+}
+
+export async function getLoadoutById(id: number): Promise<GuardianLoadout | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  
+  const result = await db.select().from(guardianLoadouts)
+    .where(eq(guardianLoadouts.id, id))
+    .limit(1);
+  return result[0];
+}
+
+export async function getDefaultLoadout(userId: number): Promise<GuardianLoadout | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  
+  const result = await db.select().from(guardianLoadouts)
+    .where(and(
+      eq(guardianLoadouts.userId, userId),
+      eq(guardianLoadouts.isDefault, true)
+    ))
+    .limit(1);
+  return result[0];
+}
+
+export async function updateLoadout(id: number, updates: Partial<InsertGuardianLoadout>): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.update(guardianLoadouts)
+    .set(updates)
+    .where(eq(guardianLoadouts.id, id));
+}
+
+export async function deleteLoadout(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  await db.delete(guardianLoadouts).where(eq(guardianLoadouts.id, id));
+}
+
+export async function setDefaultLoadout(userId: number, loadoutId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  // Clear existing default
+  await db.update(guardianLoadouts)
+    .set({ isDefault: false })
+    .where(eq(guardianLoadouts.userId, userId));
+  
+  // Set new default
+  await db.update(guardianLoadouts)
+    .set({ isDefault: true })
+    .where(and(
+      eq(guardianLoadouts.id, loadoutId),
+      eq(guardianLoadouts.userId, userId)
+    ));
+}
+
+export async function incrementLoadoutUsage(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  const loadout = await getLoadoutById(id);
+  if (loadout) {
+    await db.update(guardianLoadouts)
+      .set({ 
+        timesUsed: (loadout.timesUsed || 0) + 1,
+        lastUsedAt: new Date()
+      })
+      .where(eq(guardianLoadouts.id, id));
+  }
+}
+
+export async function assignLoadoutSlot(loadoutId: number, slotNumber: number, userId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  
+  // Clear any existing loadout in this slot for this user
+  await db.update(guardianLoadouts)
+    .set({ slotNumber: null })
+    .where(and(
+      eq(guardianLoadouts.userId, userId),
+      eq(guardianLoadouts.slotNumber, slotNumber)
+    ));
+  
+  // Assign the slot to the new loadout
+  await db.update(guardianLoadouts)
+    .set({ slotNumber })
+    .where(and(
+      eq(guardianLoadouts.id, loadoutId),
+      eq(guardianLoadouts.userId, userId)
+    ));
 }

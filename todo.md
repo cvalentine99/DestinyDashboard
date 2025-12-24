@@ -206,3 +206,13 @@
 - [x] Achievement notification popups
 - [x] Triumphs page with progress tracking
 - [x] Achievement rewards (unlock cosmetics, titles)
+
+## Loadout System
+- [x] Database schema for loadouts (userId, name, class, weapon, icon, isDefault)
+- [x] Create loadout API endpoints (create, update, delete, list, setDefault)
+- [x] Loadout selection UI in game start menu
+- [x] Quick-switch loadout buttons (1-5 slots)
+- [x] Loadout icons/thumbnails based on class
+- [x] Default loadout auto-selection on game start
+- [x] Loadout management integrated into game start screen
+- [x] 33 loadout system tests passing

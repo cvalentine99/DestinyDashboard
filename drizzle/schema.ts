@@ -533,3 +533,33 @@ export const achievementNotifications = mysqlTable("achievement_notifications", 
 
 export type AchievementNotification = typeof achievementNotifications.$inferSelect;
 export type InsertAchievementNotification = typeof achievementNotifications.$inferInsert;
+
+
+// ============================================================================
+// LOADOUT SYSTEM
+// ============================================================================
+
+// Guardian Loadouts - saved weapon/class combinations
+export const guardianLoadouts = mysqlTable("guardian_loadouts", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  name: varchar("name", { length: 64 }).notNull(),
+  // Guardian class: titan, hunter, warlock
+  guardianClass: mysqlEnum("guardianClass", ["titan", "hunter", "warlock"]).notNull(),
+  // Primary weapon: auto_rifle, hand_cannon, pulse_rifle, rocket_launcher
+  primaryWeapon: mysqlEnum("primaryWeapon", ["auto_rifle", "hand_cannon", "pulse_rifle", "rocket_launcher"]).notNull(),
+  // Icon/color theme for the loadout
+  iconColor: varchar("iconColor", { length: 32 }).default("#00d4aa"),
+  // Is this the default loadout for this user?
+  isDefault: boolean("isDefault").default(false).notNull(),
+  // Slot number (1-5) for quick switching
+  slotNumber: int("slotNumber"),
+  // Usage stats
+  timesUsed: int("timesUsed").default(0).notNull(),
+  lastUsedAt: timestamp("lastUsedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type GuardianLoadout = typeof guardianLoadouts.$inferSelect;
+export type InsertGuardianLoadout = typeof guardianLoadouts.$inferInsert;
