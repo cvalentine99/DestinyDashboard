@@ -233,3 +233,21 @@
 - [x] Interactive node selection with detailed info panel
 - [x] Canvas rendering with DPR scaling for crisp visuals
 - [x] Physics-based node movement with damping
+
+
+## Crucible Operations Center Redesign ("The Nine" Style)
+- [x] Header with "THE NINE" branding, IP/MAC display, and CAPTURE status
+- [x] Crucible Telemetry section with animated latency graph (45ms range)
+- [x] Jitter Stability graph with 1ms baseline
+- [x] Packet Loss indicator bar (red warning style)
+- [x] Vanguard Security Protocols panel with Geo-Fencing toggle
+- [x] Cheater Database status with threat count (2 THREATS badge)
+- [x] VoIP Comms Array section with Voice Quality (MOS) score display
+- [x] Voice Jitter metric (1.3ms style)
+- [x] Live waveform/histogram visualization for voice quality
+- [x] Lobby Telemetry table with Guardian names, platform badges, region, latency, jitter, loss/threat
+- [x] Action buttons (Report) for suspicious players with VPN DETECTED/ELEVATED badges
+- [x] Match History Correlation cards (Trials of Osiris, Competitive, Iron Banner)
+- [x] K/D ratio and ping stats per match type
+- [x] Net Deaths indicator with skull icons
+- [x] Dark surveillance dashboard aesthetic with cyan/red accent colors

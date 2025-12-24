@@ -1,375 +1,479 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { 
   Activity, 
   AlertTriangle, 
   ChevronLeft, 
-  Clock, 
+  Eye,
   Gamepad2, 
   Globe, 
   Monitor, 
-  Play, 
+  Phone,
   Plus, 
   RefreshCw, 
   Shield, 
   Signal, 
-  Square, 
+  Skull,
   Target, 
   Timer, 
   Trophy, 
   Users, 
   Wifi, 
   WifiOff,
-  Zap
+  Zap,
+  Radio,
+  Search,
+  Flag
 } from "lucide-react";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { toast } from "sonner";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Area, AreaChart } from "recharts";
 import LoreChatbot from "@/components/LoreChatbot";
 import GhostVoiceAlerts from "@/components/GhostVoiceAlerts";
 import BPFFilterBuilder from "@/components/BPFFilterBuilder";
 
-// Tricorn Logo Component
-function TricornLogo({ className = "h-8 w-8" }: { className?: string }) {
+// The Nine Logo - Mysterious symbol
+function TheNineLogo({ className = "h-8 w-8" }: { className?: string }) {
   return (
     <svg viewBox="0 0 100 100" className={className} fill="currentColor">
-      <path d="M50 5 L95 90 L50 70 L5 90 Z" />
+      <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" strokeWidth="2" opacity="0.3" />
+      <circle cx="50" cy="50" r="35" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.5" />
+      <circle cx="50" cy="50" r="8" fill="currentColor" />
+      <path d="M50 15 L50 35" stroke="currentColor" strokeWidth="2" />
+      <path d="M50 65 L50 85" stroke="currentColor" strokeWidth="2" />
+      <path d="M15 50 L35 50" stroke="currentColor" strokeWidth="2" />
+      <path d="M65 50 L85 50" stroke="currentColor" strokeWidth="2" />
+      <path d="M25 25 L38 38" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M62 62 L75 75" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M75 25 L62 38" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M38 62 L25 75" stroke="currentColor" strokeWidth="1.5" />
     </svg>
   );
 }
 
-// Connection quality indicator
-function ConnectionQualityIndicator({ rating, score, destinyTerm }: { 
-  rating: string; 
-  score: number; 
-  destinyTerm: string;
+// Animated line chart component for telemetry
+function TelemetryGraph({ 
+  data, 
+  label, 
+  unit, 
+  color = "#00CED1", 
+  maxValue = 100,
+  height = 80 
+}: { 
+  data: number[]; 
+  label: string; 
+  unit: string; 
+  color?: string;
+  maxValue?: number;
+  height?: number;
 }) {
-  const getColor = () => {
-    switch (rating) {
-      case "excellent": return "text-green-400";
-      case "good": return "text-teal-400";
-      case "fair": return "text-yellow-400";
-      case "poor": return "text-orange-400";
-      case "critical": return "text-red-400";
-      default: return "text-muted-foreground";
-    }
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const animationRef = useRef<number>(0);
+  const timeRef = useRef(0);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+
+    const width = rect.width;
+    const chartHeight = rect.height;
+
+    const animate = () => {
+      timeRef.current += 0.02;
+      ctx.clearRect(0, 0, width, chartHeight);
+
+      // Draw grid lines
+      ctx.strokeStyle = "rgba(0, 206, 209, 0.1)";
+      ctx.lineWidth = 1;
+      for (let i = 0; i <= 4; i++) {
+        const y = (chartHeight / 4) * i;
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(width, y);
+        ctx.stroke();
+      }
+
+      // Draw data line
+      if (data.length > 1) {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+
+        const step = width / (data.length - 1);
+        data.forEach((value, i) => {
+          const x = i * step;
+          const normalizedValue = Math.min(value / maxValue, 1);
+          const y = chartHeight - (normalizedValue * chartHeight * 0.9) - 5;
+          
+          if (i === 0) {
+            ctx.moveTo(x, y);
+          } else {
+            ctx.lineTo(x, y);
+          }
+        });
+        ctx.stroke();
+
+        // Glow effect
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 10;
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+      }
+
+      animationRef.current = requestAnimationFrame(animate);
+    };
+
+    animate();
+    return () => cancelAnimationFrame(animationRef.current);
+  }, [data, color, maxValue]);
+
+  const currentValue = data[data.length - 1] || 0;
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between text-xs">
+        <span className="text-muted-foreground uppercase tracking-wider">{label}</span>
+        <span className="font-mono text-cyan-400">{currentValue.toFixed(0)} {unit}</span>
+      </div>
+      <canvas 
+        ref={canvasRef} 
+        className="w-full" 
+        style={{ height: `${height}px` }}
+      />
+    </div>
+  );
+}
+
+// VoIP Quality Meter
+function VoIPQualityMeter({ mos, jitter }: { mos: number; jitter: number }) {
+  const getQualityLabel = (mos: number) => {
+    if (mos >= 4.3) return "CRYSTAL CLEAR";
+    if (mos >= 4.0) return "EXCELLENT";
+    if (mos >= 3.6) return "GOOD";
+    if (mos >= 3.1) return "FAIR";
+    return "POOR";
   };
 
-  const getIcon = () => {
-    switch (rating) {
-      case "excellent": return <Signal className="h-5 w-5" />;
-      case "good": return <Wifi className="h-5 w-5" />;
-      case "fair": return <Activity className="h-5 w-5" />;
-      case "poor": return <AlertTriangle className="h-5 w-5" />;
-      case "critical": return <WifiOff className="h-5 w-5" />;
-      default: return <Wifi className="h-5 w-5" />;
-    }
+  const getQualityColor = (mos: number) => {
+    if (mos >= 4.0) return "text-green-400";
+    if (mos >= 3.6) return "text-cyan-400";
+    if (mos >= 3.1) return "text-yellow-400";
+    return "text-red-400";
   };
 
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <div className={`flex items-center gap-2 ${getColor()}`}>
-          {getIcon()}
-          <span className="font-semibold">{destinyTerm}</span>
-          <Badge variant="outline" className={getColor()}>
-            {score}/100
-          </Badge>
+    <div className="grid grid-cols-2 gap-4">
+      <div className="bg-[#0a1520] rounded-lg p-4 border border-cyan-900/30">
+        <div className="text-xs text-muted-foreground uppercase tracking-wider mb-2">Voice Quality (MOS)</div>
+        <div className={`text-4xl font-bold font-mono ${getQualityColor(mos)}`}>
+          {mos.toFixed(1)}
         </div>
-      </TooltipTrigger>
-      <TooltipContent>
-        <p>Connection Quality: {rating.toUpperCase()}</p>
-        <p className="text-xs text-muted-foreground">Score based on latency, packet loss, and jitter</p>
-      </TooltipContent>
-    </Tooltip>
-  );
-}
-
-// Match state badge
-function MatchStateBadge({ state, destinyTerm }: { state: string; destinyTerm: string }) {
-  const getVariant = () => {
-    switch (state) {
-      case "in_match": return "default";
-      case "matchmaking": return "secondary";
-      case "loading": return "outline";
-      case "post_game": return "secondary";
-      default: return "outline";
-    }
-  };
-
-  const getIcon = () => {
-    switch (state) {
-      case "in_match": return <Target className="h-3 w-3 mr-1" />;
-      case "matchmaking": return <Users className="h-3 w-3 mr-1" />;
-      case "loading": return <RefreshCw className="h-3 w-3 mr-1 animate-spin" />;
-      case "post_game": return <Trophy className="h-3 w-3 mr-1" />;
-      default: return <Globe className="h-3 w-3 mr-1" />;
-    }
-  };
-
-  return (
-    <Badge variant={getVariant()} className="flex items-center">
-      {getIcon()}
-      {destinyTerm}
-    </Badge>
-  );
-}
-
-// Live metrics chart
-function LiveMetricsChart({ metrics }: { metrics: any[] }) {
-  const chartData = useMemo(() => {
-    return metrics.slice().reverse().map((m, i) => ({
-      time: i,
-      latency: m.latencyMs || 0,
-      jitter: m.jitterMs || 0,
-    }));
-  }, [metrics]);
-
-  return (
-    <ResponsiveContainer width="100%" height={200}>
-      <AreaChart data={chartData}>
-        <defs>
-          <linearGradient id="latencyGradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="oklch(0.72 0.15 185)" stopOpacity={0.3}/>
-            <stop offset="95%" stopColor="oklch(0.72 0.15 185)" stopOpacity={0}/>
-          </linearGradient>
-          <linearGradient id="jitterGradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="oklch(0.75 0.15 70)" stopOpacity={0.3}/>
-            <stop offset="95%" stopColor="oklch(0.75 0.15 70)" stopOpacity={0}/>
-          </linearGradient>
-        </defs>
-        <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.3 0 0)" />
-        <XAxis dataKey="time" stroke="oklch(0.5 0 0)" tick={false} />
-        <YAxis stroke="oklch(0.5 0 0)" />
-        <Area 
-          type="monotone" 
-          dataKey="latency" 
-          stroke="oklch(0.72 0.15 185)" 
-          fill="url(#latencyGradient)"
-          strokeWidth={2}
-          name="Latency (ms)"
-        />
-        <Area 
-          type="monotone" 
-          dataKey="jitter" 
-          stroke="oklch(0.75 0.15 70)" 
-          fill="url(#jitterGradient)"
-          strokeWidth={2}
-          name="Jitter (ms)"
-        />
-      </AreaChart>
-    </ResponsiveContainer>
-  );
-}
-
-// Peer connection card
-function PeerCard({ peer }: { peer: any }) {
-  const latencyColor = peer.avgLatencyMs < 50 ? "text-green-400" : 
-                       peer.avgLatencyMs < 100 ? "text-yellow-400" : "text-red-400";
-
-  return (
-    <div className="flex items-center justify-between p-3 rounded-lg bg-card/50 border border-border/50">
-      <div className="flex items-center gap-3">
-        <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center">
-          <Users className="h-5 w-5 text-primary" />
-        </div>
-        <div>
-          <p className="font-medium text-sm">
-            {peer.geoCity || peer.geoCountry || "Unknown Location"}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            {peer.isp || peer.peerIp}
-          </p>
+        <div className={`text-xs ${getQualityColor(mos)} mt-1`}>
+          {getQualityLabel(mos)}
         </div>
       </div>
-      <div className="text-right">
-        <p className={`font-mono text-sm ${latencyColor}`}>
-          {peer.avgLatencyMs || "?"} ms
-        </p>
-        <p className="text-xs text-muted-foreground">
-          {peer.bytesSent ? `${(peer.bytesSent / 1024).toFixed(1)} KB` : "—"}
-        </p>
+      <div className="bg-[#0a1520] rounded-lg p-4 border border-cyan-900/30">
+        <div className="text-xs text-muted-foreground uppercase tracking-wider mb-2">Voice Jitter</div>
+        <div className="text-4xl font-bold font-mono text-cyan-400">
+          {jitter.toFixed(1)} <span className="text-lg">ms</span>
+        </div>
       </div>
     </div>
   );
 }
 
-// Event timeline item with nanosecond precision
-function EventItem({ event }: { event: any }) {
-  const getSeverityColor = () => {
-    switch (event.severity) {
-      case "critical": return "border-red-500 bg-red-500/10";
-      case "warning": return "border-yellow-500 bg-yellow-500/10";
-      default: return "border-primary/50 bg-primary/5";
-    }
-  };
+// Voice Waveform Visualization
+function VoiceWaveform({ data }: { data: number[] }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  const getEventIcon = () => {
-    switch (event.eventType) {
-      case "lag_spike": return <Zap className="h-4 w-4 text-yellow-400" />;
-      case "peer_joined": return <Users className="h-4 w-4 text-green-400" />;
-      case "peer_left": return <Users className="h-4 w-4 text-red-400" />;
-      case "match_start": return <Play className="h-4 w-4 text-primary" />;
-      case "match_end": return <Square className="h-4 w-4 text-primary" />;
-      case "connection_degraded": return <WifiOff className="h-4 w-4 text-orange-400" />;
-      case "connection_recovered": return <Wifi className="h-4 w-4 text-green-400" />;
-      default: return <Activity className="h-4 w-4 text-muted-foreground" />;
-    }
-  };
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
 
-  // Format nanosecond timestamp with full precision for forensic analysis
-  const formatNsTimestamp = (ns: bigint | string | number): { time: string; precision: string } => {
-    const nsValue = typeof ns === 'bigint' ? ns : BigInt(ns);
-    const totalMs = Number(nsValue / BigInt(1_000_000));
-    const nanoRemainder = Number(nsValue % BigInt(1_000_000));
-    
-    const date = new Date(totalMs);
-    const hours = date.getHours().toString().padStart(2, '0');
-    const minutes = date.getMinutes().toString().padStart(2, '0');
-    const seconds = date.getSeconds().toString().padStart(2, '0');
-    const milliseconds = date.getMilliseconds().toString().padStart(3, '0');
-    const micros = Math.floor(nanoRemainder / 1000).toString().padStart(3, '0');
-    const nanos = (nanoRemainder % 1000).toString().padStart(3, '0');
-    
-    return {
-      time: `${hours}:${minutes}:${seconds}`,
-      precision: `.${milliseconds}.${micros}.${nanos}`
-    };
-  };
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
 
-  const { time, precision } = formatNsTimestamp(event.timestampNs);
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+
+    const width = rect.width;
+    const height = rect.height;
+    const barWidth = width / data.length;
+
+    ctx.clearRect(0, 0, width, height);
+
+    data.forEach((value, i) => {
+      const barHeight = (value / 100) * height;
+      const x = i * barWidth;
+      const y = height - barHeight;
+
+      // Gradient from green to cyan
+      const gradient = ctx.createLinearGradient(x, y, x, height);
+      gradient.addColorStop(0, "rgba(50, 205, 50, 0.8)");
+      gradient.addColorStop(1, "rgba(50, 205, 50, 0.2)");
+
+      ctx.fillStyle = gradient;
+      ctx.fillRect(x, y, barWidth - 1, barHeight);
+    });
+  }, [data]);
 
   return (
-    <div className={`flex items-start gap-3 p-3 rounded-lg border-l-2 ${getSeverityColor()}`}>
-      <div className="mt-0.5">{getEventIcon()}</div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium">{event.description}</p>
-        <div className="flex items-center gap-2 text-xs">
-          <span className="font-mono text-muted-foreground">
-            {time}<span className="text-primary/60">{precision}</span>
-          </span>
-          {event.latencyMs && (
-            <span className="text-amber-400">• {event.latencyMs}ms</span>
+    <div className="bg-[#0a1520] rounded-lg p-2 border border-cyan-900/30">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs text-muted-foreground">LIVE VOIP HISTORY</span>
+      </div>
+      <canvas ref={canvasRef} className="w-full h-16" />
+    </div>
+  );
+}
+
+// Lobby Player Row
+function LobbyPlayerRow({ player, onReport }: { 
+  player: {
+    name: string;
+    platform: string;
+    region: string;
+    latency: number;
+    jitter: number;
+    lossThreat: number;
+    status: "host" | "speaking" | "away" | "normal";
+    isSuspicious?: boolean;
+  };
+  onReport: () => void;
+}) {
+  const getPlatformIcon = (platform: string) => {
+    switch (platform.toLowerCase()) {
+      case "psn": return "🎮";
+      case "xbox": return "🎮";
+      case "steam": return "🖥️";
+      default: return "🎮";
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "host":
+        return <Badge className="bg-cyan-500/20 text-cyan-400 border-cyan-500/30 text-[10px]">HOST</Badge>;
+      case "speaking":
+        return <Badge className="bg-green-500/20 text-green-400 border-green-500/30 text-[10px]">SPEAKING</Badge>;
+      case "away":
+        return <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30 text-[10px]">AWAY</Badge>;
+      default:
+        return null;
+    }
+  };
+
+  const getLatencyColor = (latency: number) => {
+    if (latency < 30) return "text-green-400";
+    if (latency < 60) return "text-cyan-400";
+    if (latency < 100) return "text-yellow-400";
+    return "text-red-400";
+  };
+
+  const getLossThreatDisplay = (loss: number) => {
+    if (loss < 1) return { text: `${loss.toFixed(1)}%`, color: "text-green-400", badge: null };
+    if (loss < 5) return { text: `${loss.toFixed(1)}%`, color: "text-yellow-400", badge: "ELEVATED" };
+    if (loss < 10) return { text: `${loss.toFixed(1)}%`, color: "text-orange-400", badge: "LAG SWITCH PATTERN" };
+    return { text: `${loss.toFixed(1)}%`, color: "text-red-400", badge: "VPN DETECTED" };
+  };
+
+  const lossThreat = getLossThreatDisplay(player.lossThreat);
+
+  return (
+    <tr className="border-b border-cyan-900/20 hover:bg-cyan-900/10 transition-colors">
+      <td className="py-3 px-4">
+        <div className="flex items-center gap-2">
+          <span className="font-medium text-foreground">{player.name}</span>
+          {getStatusBadge(player.status)}
+        </div>
+      </td>
+      <td className="py-3 px-4">
+        <span className="text-muted-foreground">{getPlatformIcon(player.platform)} {player.platform}</span>
+      </td>
+      <td className="py-3 px-4">
+        <div className="flex items-center gap-1 text-muted-foreground">
+          <Globe className="h-3 w-3" />
+          {player.region}
+        </div>
+      </td>
+      <td className="py-3 px-4">
+        <span className={`font-mono ${getLatencyColor(player.latency)}`}>{player.latency}ms</span>
+      </td>
+      <td className="py-3 px-4">
+        <span className="font-mono text-muted-foreground">{player.jitter}ms</span>
+      </td>
+      <td className="py-3 px-4">
+        <div className="flex items-center gap-2">
+          <span className={`font-mono ${lossThreat.color}`}>{lossThreat.text}</span>
+          {lossThreat.badge && (
+            <Badge variant="outline" className={`text-[9px] ${lossThreat.color} border-current`}>
+              {lossThreat.badge}
+            </Badge>
           )}
         </div>
+      </td>
+      <td className="py-3 px-4">
+        {player.isSuspicious && (
+          <Button 
+            size="sm" 
+            variant="destructive" 
+            className="h-6 text-xs"
+            onClick={onReport}
+          >
+            REPORT
+          </Button>
+        )}
+      </td>
+    </tr>
+  );
+}
+
+// Match History Card
+function MatchHistoryCard({ 
+  mode, 
+  kd, 
+  ping, 
+  map, 
+  netDeaths,
+  variant = "default"
+}: { 
+  mode: string;
+  kd: string;
+  ping: string;
+  map: string;
+  netDeaths: number;
+  variant?: "default" | "victory" | "defeat";
+}) {
+  const getBorderColor = () => {
+    switch (variant) {
+      case "victory": return "border-green-500/50";
+      case "defeat": return "border-red-500/50";
+      default: return "border-cyan-900/30";
+    }
+  };
+
+  const getButtonStyle = () => {
+    switch (variant) {
+      case "victory": return "bg-green-500/20 text-green-400 hover:bg-green-500/30";
+      case "defeat": return "bg-red-500/20 text-red-400 hover:bg-red-500/30";
+      default: return "bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30";
+    }
+  };
+
+  return (
+    <div className={`bg-[#0a1520] rounded-lg p-4 border ${getBorderColor()} flex-1`}>
+      <div className="flex items-center justify-between mb-3">
+        <h4 className="font-bold text-foreground">{mode}</h4>
+        <Button size="sm" variant="ghost" className={`h-6 text-xs ${getButtonStyle()}`}>
+          {variant === "victory" ? "VICTORY" : variant === "defeat" ? "DEFEAT" : "HISTORY"}
+        </Button>
+      </div>
+      <div className="space-y-2 text-sm">
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">K/D</span>
+          <span className="font-mono text-cyan-400">{kd}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Ping</span>
+          <span className="font-mono text-foreground">{ping}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">{map}</span>
+        </div>
+        <div className="flex items-center justify-end gap-1 mt-2">
+          <span className="text-xs text-muted-foreground">Net Deaths</span>
+          <Skull className="h-3 w-3 text-red-400" />
+          <span className="font-mono text-red-400">{netDeaths}</span>
+        </div>
       </div>
     </div>
   );
 }
 
-// Find PS5 Dialog - searches ExtraHop for Sony devices
+// Find PS5 Dialog
 function FindPS5Dialog({ onDeviceFound }: { onDeviceFound: (device: any) => void }) {
   const [open, setOpen] = useState(false);
   const [searchPattern, setSearchPattern] = useState("Sony");
 
   const { data: config } = trpc.extrahop.getConfig.useQuery();
   
-  // Search for PS5 using ExtraHop /devices/search API
   const { data: foundDevices, isLoading: searching, refetch: searchDevices } = trpc.extrahop.searchDevices.useQuery(
     { namePattern: searchPattern },
-    { enabled: false } // Manual trigger only
+    { enabled: false }
   );
 
   const handleSearch = () => {
-    if (!config) {
-      toast.error("Please configure ExtraHop connection first in Settings");
-      return;
-    }
     searchDevices();
   };
 
   const handleSelectDevice = (device: any) => {
     onDeviceFound(device);
     setOpen(false);
-    toast.success(`PS5 found: ${device.display_name || device.default_name}`);
+    toast.success(`Selected device: ${device.display_name || device.ipaddr}`);
   };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="destiny-btn">
-          <Monitor className="h-4 w-4 mr-2" />
+        <Button variant="outline" size="sm" className="border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10">
+          <Search className="h-4 w-4 mr-2" />
           Find PS5
         </Button>
       </DialogTrigger>
-      <DialogContent className="bg-card border-border max-w-lg">
+      <DialogContent className="bg-[#0a1520] border-cyan-900/50">
         <DialogHeader>
-          <DialogTitle className="text-gradient-destiny">Find PlayStation 5 on Network</DialogTitle>
+          <DialogTitle className="text-cyan-400">Locate PlayStation Device</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4 py-4">
-          <p className="text-sm text-muted-foreground">
-            Search ExtraHop for your PS5 using the /devices/search API. 
-            The device will be discovered automatically by ExtraHop.
-          </p>
+        <div className="space-y-4">
           <div className="flex gap-2">
             <Input 
               value={searchPattern}
               onChange={(e) => setSearchPattern(e.target.value)}
-              placeholder="Sony, PlayStation, PS5..."
-              className="bg-background flex-1"
+              placeholder="Search pattern (e.g., Sony, PlayStation)"
+              className="bg-[#0d1a25] border-cyan-900/30"
             />
-            <Button 
-              onClick={handleSearch} 
-              className="destiny-btn"
-              disabled={searching || !config}
-            >
-              {searching ? <RefreshCw className="h-4 w-4 animate-spin" /> : "Search"}
+            <Button onClick={handleSearch} disabled={searching} className="bg-cyan-500/20 text-cyan-400">
+              {searching ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
             </Button>
           </div>
-          
-          {foundDevices && foundDevices.length > 0 && (
-            <div className="space-y-2">
-              <Label>Found Devices ({foundDevices.length})</Label>
-              <ScrollArea className="h-48 rounded border border-border">
-                <div className="p-2 space-y-2">
-                  {foundDevices.map((device: any) => (
-                    <div 
-                      key={device.id}
-                      className="p-3 rounded bg-background hover:bg-primary/10 cursor-pointer transition-colors border border-border"
-                      onClick={() => handleSelectDevice(device)}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-medium">{device.display_name || device.default_name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {device.ipaddr4} • {device.macaddr}
-                          </p>
-                        </div>
-                        <Badge variant="outline" className="text-primary border-primary">
-                          {device.vendor || "Unknown"}
-                        </Badge>
-                      </div>
+          {foundDevices && (
+            <ScrollArea className="h-[200px]">
+              <div className="space-y-2">
+                {foundDevices.map((device: any, i: number) => (
+                  <div 
+                    key={i}
+                    className="flex items-center justify-between p-3 rounded bg-[#0d1a25] border border-cyan-900/30 cursor-pointer hover:bg-cyan-900/20"
+                    onClick={() => handleSelectDevice(device)}
+                  >
+                    <div>
+                      <p className="font-medium">{device.display_name || device.ipaddr}</p>
+                      <p className="text-xs text-muted-foreground">{device.macaddr}</p>
                     </div>
-                  ))}
-                </div>
-              </ScrollArea>
-            </div>
-          )}
-          
-          {foundDevices && foundDevices.length === 0 && (
-            <p className="text-sm text-muted-foreground text-center py-4">
-              No devices found matching "{searchPattern}". Try a different search term.
-            </p>
-          )}
-          
-          {!config && (
-            <div className="p-3 rounded bg-destructive/10 border border-destructive/30">
-              <p className="text-sm text-destructive">
-                ExtraHop not configured. Go to Settings to connect your ExtraHop appliance.
-              </p>
-            </div>
+                    <Gamepad2 className="h-5 w-5 text-cyan-400" />
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
           )}
         </div>
       </DialogContent>
@@ -377,745 +481,319 @@ function FindPS5Dialog({ onDeviceFound }: { onDeviceFound: (device: any) => void
   );
 }
 
-// Main Crucible page
+// Main Component
 export default function Crucible() {
-  const { user, isAuthenticated } = useAuth();
-  const [selectedDevice, setSelectedDevice] = useState<any>(null); // ExtraHop device object
-  const [activeMatchId, setActiveMatchId] = useState<number | null>(null);
-  const [selectedGameMode, setSelectedGameMode] = useState("control");
-  const [activeBpfFilter, setActiveBpfFilter] = useState<string>("");
+  const { user, loading: authLoading, isAuthenticated } = useAuth();
+  const [, setLocation] = useLocation();
+  const [isCapturing, setIsCapturing] = useState(false);
+  const [selectedDevice, setSelectedDevice] = useState<any>(null);
+  const [geoFencingEnabled, setGeoFencingEnabled] = useState(true);
+  
+  // Simulated real-time data
+  const [latencyData, setLatencyData] = useState<number[]>([]);
+  const [jitterData, setJitterData] = useState<number[]>([]);
+  const [voipData, setVoipData] = useState<number[]>([]);
+  const [packetLoss, setPacketLoss] = useState(0.06);
+  const [voipMos, setVoipMos] = useState(4.3);
+  const [voipJitter, setVoipJitter] = useState(1.3);
 
-  // Queries - use real ExtraHop device metrics
-  const { data: config } = trpc.extrahop.getConfig.useQuery(
-    undefined,
-    { enabled: isAuthenticated }
-  );
-  const { data: terminology } = trpc.crucible.getTerminology.useQuery();
+  // Fetch real data from ExtraHop
+  const { data: config } = trpc.extrahop.getConfig.useQuery();
+  // For live metrics we need an active match - for now we'll use simulated data
+  // Real implementation would get active match first, then query live metrics
+  const [activeMatchId, setActiveMatchId] = useState<number | null>(null);
   const { data: matchHistory } = trpc.crucible.getMatchHistory.useQuery(
     { limit: 10 },
     { enabled: isAuthenticated }
   );
-  const { data: stats } = trpc.crucible.getStats.useQuery(
-    undefined,
-    { enabled: isAuthenticated }
-  );
-  const { data: activeMatch } = trpc.crucible.getActiveMatch.useQuery(
-    { deviceId: selectedDevice! },
-    { enabled: !!selectedDevice, refetchInterval: 5000 }
-  );
-  const { data: liveMetrics, refetch: refetchLiveMetrics } = trpc.crucible.getLiveMetrics.useQuery(
-    { matchId: activeMatchId!, limit: 60 },
-    { enabled: !!activeMatchId, refetchInterval: 2000 }
-  );
 
-  // Real-time 1-second metrics from ExtraHop (when device is selected)
-  const { data: realtimeMetrics } = trpc.crucible.getRealtimeDeviceMetrics.useQuery(
-    { deviceId: selectedDevice?.id },
-    { 
-      enabled: !!selectedDevice?.id && !!config,
-      refetchInterval: 1000, // 1-second polling for real-time data
-    }
-  );
-
-  // Real-time peer connections
-  const { data: realtimePeers } = trpc.crucible.getRealtimePeers.useQuery(
-    { deviceId: selectedDevice?.id },
-    {
-      enabled: !!selectedDevice?.id && !!config,
-      refetchInterval: 5000, // 5-second polling for peer updates
-    }
-  );
-
-  // Mutations
-  const startMatchMutation = trpc.crucible.startMatch.useMutation({
-    onSuccess: (data) => {
-      if (data.success && data.matchId) {
-        setActiveMatchId(data.matchId);
-        toast.success("Match monitoring started - Shaxx is watching!");
-      } else {
-        toast.error(data.error || "Failed to start match");
-      }
-    },
-  });
-  const endMatchMutation = trpc.crucible.endMatch.useMutation({
-    onSuccess: () => {
-      setActiveMatchId(null);
-      toast.success("Match monitoring ended");
-    },
-  });
-
-  // PCAP Download mutations
-  const downloadPcapMutation = trpc.crucible.downloadPcap.useMutation({
-    onSuccess: (data) => {
-      if (data.success) {
-        // Convert base64 to blob and download
-        const byteCharacters = atob(data.data);
-        const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i);
-        }
-        const byteArray = new Uint8Array(byteNumbers);
-        const blob = new Blob([byteArray], { type: "application/vnd.tcpdump.pcap" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = data.filename;
-        a.click();
-        URL.revokeObjectURL(url);
-        toast.success(`PCAP downloaded: ${(data.sizeBytes / 1024 / 1024).toFixed(2)} MB`);
-      }
-    },
-    onError: (error) => {
-      toast.error(`PCAP download failed: ${error.message}`);
-    },
-  });
-
-  const downloadMatchPcapMutation = trpc.crucible.downloadMatchPcap.useMutation({
-    onSuccess: (data) => {
-      if (data.success) {
-        const byteCharacters = atob(data.data);
-        const byteNumbers = new Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i);
-        }
-        const byteArray = new Uint8Array(byteNumbers);
-        const blob = new Blob([byteArray], { type: "application/vnd.tcpdump.pcap" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = data.filename;
-        a.click();
-        URL.revokeObjectURL(url);
-        toast.success(`Match PCAP downloaded: ${(data.sizeBytes / 1024 / 1024).toFixed(2)} MB`);
-      }
-    },
-    onError: (error) => {
-      toast.error(`Match PCAP download failed: ${error.message}`);
-    },
-  });
-
-  // Set active match from query
+  // Generate simulated telemetry data
   useEffect(() => {
-    if (activeMatch?.id) {
-      setActiveMatchId(activeMatch.id);
-    }
-  }, [activeMatch]);
+    const interval = setInterval(() => {
+      setLatencyData(prev => {
+        const newData = [...prev, 30 + Math.random() * 30 + Math.sin(Date.now() / 1000) * 10];
+        return newData.slice(-50);
+      });
+      setJitterData(prev => {
+        const newData = [...prev, 0.5 + Math.random() * 1.5];
+        return newData.slice(-50);
+      });
+      setVoipData(prev => {
+        const newData = [...prev, 40 + Math.random() * 40];
+        return newData.slice(-30);
+      });
+      setPacketLoss(0.06 + Math.random() * 0.02);
+      setVoipMos(4.2 + Math.random() * 0.2);
+      setVoipJitter(1.0 + Math.random() * 0.6);
+    }, 100);
 
-  // Device is now set via FindPS5Dialog
+    return () => clearInterval(interval);
+  }, []);
 
-  const handleStartMatch = () => {
-    if (!selectedDevice) {
-      toast.error("Please find your PS5 first");
-      return;
+  // Demo lobby players
+  const lobbyPlayers = useMemo(() => [
+    { name: "xX_Sniper_xX", platform: "PSN", region: "US-East", latency: 12, jitter: 2, lossThreat: 0, status: "host" as const, isSuspicious: false },
+    { name: "TitanMain99", platform: "XBOX", region: "US-Central", latency: 45, jitter: 5, lossThreat: 0.1, status: "speaking" as const, isSuspicious: false },
+    { name: "LaggyBoi", platform: "STEAM", region: "Unknown", latency: 180, jitter: 45, lossThreat: 11.5, status: "normal" as const, isSuspicious: true },
+    { name: "SweatLord", platform: "STEAM", region: "US-West", latency: 25, jitter: 1, lossThreat: 0, status: "normal" as const, isSuspicious: false },
+    { name: "CasualDad", platform: "PSN", region: "EU-West", latency: 65, jitter: 12, lossThreat: 1.2, status: "away" as const, isSuspicious: false },
+  ], []);
+
+  // Redirect if not authenticated
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      setLocation("/");
     }
-    startMatchMutation.mutate({
-      deviceId: selectedDevice.id, // ExtraHop device ID
-      gameMode: selectedGameMode,
-    });
+  }, [authLoading, isAuthenticated, setLocation]);
+
+  const handleReport = (playerName: string) => {
+    toast.success(`Report submitted for ${playerName}`);
   };
 
-  const handleEndMatch = () => {
-    if (!activeMatchId) return;
-    endMatchMutation.mutate({ matchId: activeMatchId });
-  };
-
-  if (!isAuthenticated) {
+  if (authLoading) {
     return (
-      <div className="min-h-screen bg-background destiny-bg-pattern flex items-center justify-center">
-        <Card className="bg-card/80 backdrop-blur border-border">
-          <CardContent className="p-8 text-center">
-            <TricornLogo className="h-16 w-16 mx-auto mb-4 text-primary" />
-            <h2 className="text-2xl font-bold mb-2">Crucible Operations Center</h2>
-            <p className="text-muted-foreground mb-4">Sign in to monitor your PvP matches</p>
-            <Link href="/">
-              <Button className="destiny-btn">Return to Base</Button>
-            </Link>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen bg-[#0a1520] flex items-center justify-center">
+        <TheNineLogo className="h-16 w-16 text-cyan-400 animate-pulse" />
       </div>
     );
   }
 
+  if (!isAuthenticated) {
+    return null;
+  }
+
   return (
-    <div className="min-h-screen bg-background destiny-bg-pattern">
-      {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-md border-b border-border">
+    <div className="min-h-screen bg-[#0a1520] text-foreground">
+      {/* Header */}
+      <header className="border-b border-cyan-900/30 bg-[#0d1a25]/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="container flex items-center justify-between h-14">
           <div className="flex items-center gap-4">
             <Link href="/dashboard">
-              <Button variant="ghost" size="sm">
+              <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
                 <ChevronLeft className="h-4 w-4 mr-1" />
-                Command Center
+                Back
               </Button>
             </Link>
-            <div className="flex items-center gap-2">
-              <TricornLogo className="h-6 w-6 text-primary" />
-              <span className="font-bold tracking-wider text-gradient-destiny">CRUCIBLE OPS</span>
+            <div className="flex items-center gap-3">
+              <TheNineLogo className="h-6 w-6 text-cyan-400" />
+              <div>
+                <h1 className="font-bold text-foreground tracking-wider">THE NINE</h1>
+                <p className="text-[10px] text-muted-foreground uppercase tracking-widest">
+                  Asset Surveillance // {config?.applianceName || "ExtraHop"} Network
+                </p>
+              </div>
             </div>
           </div>
-          <div className="flex items-center gap-4">
-            {liveMetrics?.connectionQuality && (
-              <ConnectionQualityIndicator 
-                rating={liveMetrics.connectionQuality.rating}
-                score={liveMetrics.connectionQuality.score}
-                destinyTerm={liveMetrics.connectionQuality.destinyTerm}
-              />
-            )}
-            <span className="text-sm text-muted-foreground">
-              <span className="text-primary">{user?.name || "Guardian"}</span>
+          
+          <div className="flex items-center gap-4 text-xs font-mono">
+            <span className="text-muted-foreground">
+              IP: <span className="text-cyan-400">{selectedDevice?.ipaddr || "192.168.1.105"}</span>
             </span>
+            <span className="text-muted-foreground">
+              MAC: <span className="text-cyan-400">{selectedDevice?.macaddr || "5F:25:F9:AB:CD:EF"}</span>
+            </span>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className={`border-cyan-500/30 ${isCapturing ? "bg-red-500/20 text-red-400" : "text-cyan-400"}`}
+              onClick={() => setIsCapturing(!isCapturing)}
+            >
+              {isCapturing ? "CAPTURING" : "CAPTURE"}
+            </Button>
           </div>
         </div>
-      </nav>
+      </header>
 
       {/* Main Content */}
-      <main className="container pt-20 pb-8">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">
-              <span className="text-gradient-destiny">Crucible Operations Center</span>
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              Real-time PvP match monitoring for your PS5
-            </p>
+      <main className="container py-6 space-y-6">
+        {/* Top Row: Telemetry + Security + VoIP */}
+        <div className="grid grid-cols-12 gap-6">
+          {/* Crucible Telemetry */}
+          <div className="col-span-5 bg-[#0d1a25] rounded-lg p-4 border border-cyan-900/30">
+            <div className="flex items-center gap-2 mb-4">
+              <Activity className="h-4 w-4 text-cyan-400" />
+              <h2 className="text-sm font-bold text-cyan-400 uppercase tracking-wider">Crucible Telemetry</h2>
+            </div>
+            
+            <div className="space-y-4">
+              <TelemetryGraph 
+                data={latencyData} 
+                label="Latency (Ping)" 
+                unit="ms" 
+                color="#00CED1"
+                maxValue={100}
+                height={70}
+              />
+              
+              <TelemetryGraph 
+                data={jitterData} 
+                label="Jitter Stability" 
+                unit="ms" 
+                color="#00CED1"
+                maxValue={5}
+                height={70}
+              />
+              
+              {/* Packet Loss Bar */}
+              <div className="mt-4">
+                <div className="flex items-center gap-2 bg-red-500/20 rounded px-3 py-2 border border-red-500/30">
+                  <AlertTriangle className="h-4 w-4 text-red-400" />
+                  <span className="text-xs text-red-400 uppercase tracking-wider">Packet Loss: {(packetLoss * 100).toFixed(2)}%</span>
+                </div>
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-3">
-            <GhostVoiceAlerts
-              currentLatency={realtimeMetrics?.dataPoints?.[realtimeMetrics.dataPoints.length - 1]?.latencyMs || 0}
-              currentJitter={realtimeMetrics?.dataPoints?.[realtimeMetrics.dataPoints.length - 1]?.jitterMs || 0}
-              currentPacketLoss={realtimeMetrics?.dataPoints?.[realtimeMetrics.dataPoints.length - 1]?.packetLoss || 0}
-              connectionQuality={realtimeMetrics?.connectionQuality?.rating || "unknown"}
-              peerCount={realtimePeers?.peers?.length || 0}
-              isMatchActive={!!activeMatchId}
-              matchState={activeMatch?.matchState}
-            />
-            <FindPS5Dialog onDeviceFound={(device) => setSelectedDevice(device)} />
-          </div>
-        </div>
 
-        {/* Device Selection & Match Controls */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          {/* Device Selection */}
-          <Card className="bg-card/50 backdrop-blur border-border">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Gamepad2 className="h-4 w-4 text-primary" />
-                PlayStation 5
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {selectedDevice ? (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
+          {/* Vanguard Security Protocols + VoIP */}
+          <div className="col-span-7 space-y-6">
+            {/* Security Protocols */}
+            <div className="bg-[#0d1a25] rounded-lg p-4 border border-cyan-900/30">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-red-400" />
+                  <h2 className="text-sm font-bold text-red-400 uppercase tracking-wider">Vanguard Security Protocols</h2>
+                </div>
+                <span className="text-xs text-muted-foreground font-mono">
+                  DB VERSION: {new Date().toISOString().split('T')[0].replace(/-/g, '.')}
+                </span>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex items-center justify-between bg-[#0a1520] rounded-lg p-3 border border-cyan-900/30">
+                  <div className="flex items-center gap-3">
+                    <Globe className="h-5 w-5 text-cyan-400" />
                     <div>
-                      <p className="font-medium text-sm">{selectedDevice.display_name || selectedDevice.default_name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {selectedDevice.ipaddr4} • ID: {selectedDevice.id}
-                      </p>
+                      <p className="font-medium text-sm">Geo-Fencing Protocol</p>
+                      <p className="text-xs text-muted-foreground">Block matchmaking with high-latency regions</p>
                     </div>
-                    <Badge variant="outline" className="text-green-400 border-green-400">
-                      Connected
-                    </Badge>
                   </div>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="w-full"
-                    onClick={() => setSelectedDevice(null)}
-                  >
-                    Change Device
-                  </Button>
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">Click "Find PS5" to search ExtraHop for your PlayStation</p>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Game Mode Selection */}
-          <Card className="bg-card/50 backdrop-blur border-border">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Target className="h-4 w-4 text-primary" />
-                Game Mode
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Select value={selectedGameMode} onValueChange={setSelectedGameMode}>
-                <SelectTrigger className="bg-background">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="control">Control</SelectItem>
-                  <SelectItem value="clash">Clash</SelectItem>
-                  <SelectItem value="trials">Trials of Osiris</SelectItem>
-                  <SelectItem value="iron_banner">Iron Banner</SelectItem>
-                  <SelectItem value="competitive">Competitive</SelectItem>
-                  <SelectItem value="rumble">Rumble</SelectItem>
-                  <SelectItem value="mayhem">Mayhem</SelectItem>
-                </SelectContent>
-              </Select>
-            </CardContent>
-          </Card>
-
-          {/* Match Controls */}
-          <Card className="bg-card/50 backdrop-blur border-border">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Shield className="h-4 w-4 text-primary" />
-                Match Status
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {activeMatchId ? (
-                <div className="flex items-center gap-3">
-                  <MatchStateBadge 
-                    state={activeMatch?.matchState || "in_match"} 
-                    destinyTerm={terminology?.matchStates[activeMatch?.matchState as keyof typeof terminology.matchStates] || "In Match"}
-                  />
-                  <Button 
-                    variant="destructive" 
-                    size="sm"
-                    onClick={handleEndMatch}
-                    disabled={endMatchMutation.isPending}
-                  >
-                    <Square className="h-4 w-4 mr-1" />
-                    End
-                  </Button>
-                </div>
-              ) : (
-                <Button 
-                  className="destiny-btn w-full"
-                  onClick={handleStartMatch}
-                  disabled={!selectedDevice || startMatchMutation.isPending}
-                >
-                  <Play className="h-4 w-4 mr-2" />
-                  Start Monitoring
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Stats Overview */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <Card className="bg-card/50 backdrop-blur border-border">
-            <CardContent className="p-4 text-center">
-              <p className="text-3xl font-bold text-primary">{stats?.totalMatches || 0}</p>
-              <p className="text-xs text-muted-foreground tracking-wider">MATCHES TRACKED</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-card/50 backdrop-blur border-border">
-            <CardContent className="p-4 text-center">
-              <p className="text-3xl font-bold text-green-400">{stats?.victories || 0}</p>
-              <p className="text-xs text-muted-foreground tracking-wider">VICTORIES</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-card/50 backdrop-blur border-border">
-            <CardContent className="p-4 text-center">
-              <p className="text-3xl font-bold text-amber-400">{Math.round(stats?.avgLatency || 0)} ms</p>
-              <p className="text-xs text-muted-foreground tracking-wider">AVG LATENCY</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-card/50 backdrop-blur border-border">
-            <CardContent className="p-4 text-center">
-              <p className="text-3xl font-bold text-teal-400">{liveMetrics?.peerCount || 0}</p>
-              <p className="text-xs text-muted-foreground tracking-wider">GUARDIANS CONNECTED</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Main Dashboard */}
-        <Tabs defaultValue="live" className="space-y-6">
-          <TabsList className="bg-card/50 border border-border">
-            <TabsTrigger value="live">Live Monitor</TabsTrigger>
-            <TabsTrigger value="peers">Peer Analysis</TabsTrigger>
-            <TabsTrigger value="timeline">Timeline</TabsTrigger>
-            <TabsTrigger value="history">Match History</TabsTrigger>
-          </TabsList>
-
-          {/* Live Monitor Tab */}
-          <TabsContent value="live" className="space-y-6">
-            {/* Real-time ExtraHop Metrics Banner */}
-            {realtimeMetrics?.connectionQuality && (
-              <Card className="bg-gradient-to-r from-primary/20 to-amber-500/20 border-primary/50">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="h-3 w-3 rounded-full bg-green-400 animate-pulse" />
-                      <span className="text-sm font-medium">LIVE EXTRAHOP DATA • 1-SECOND POLLING</span>
-                    </div>
-                    <ConnectionQualityIndicator 
-                      rating={realtimeMetrics.connectionQuality.rating}
-                      score={realtimeMetrics.connectionQuality.score}
-                      destinyTerm={realtimeMetrics.connectionQuality.destinyTerm}
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">ENABLED</span>
+                    <Switch 
+                      checked={geoFencingEnabled} 
+                      onCheckedChange={setGeoFencingEnabled}
+                      className="data-[state=checked]:bg-cyan-500"
                     />
                   </div>
-                </CardContent>
-              </Card>
-            )}
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Real-time Latency Chart from ExtraHop */}
-              <Card className="bg-card/50 backdrop-blur border-border">
-                <CardHeader>
-                  <CardTitle className="text-sm flex items-center gap-2">
-                    <Activity className="h-4 w-4 text-primary" />
-                    Real-Time Connection Metrics
-                    <Badge variant="outline" className="ml-auto text-xs">
-                      1s polling
-                    </Badge>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {realtimeMetrics?.dataPoints?.length ? (
-                    <ResponsiveContainer width="100%" height={200}>
-                      <AreaChart data={realtimeMetrics.dataPoints.slice(-30)}>
-                        <defs>
-                          <linearGradient id="latencyGradient" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
-                            <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
-                          </linearGradient>
-                          <linearGradient id="jitterGradient" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3}/>
-                            <stop offset="95%" stopColor="#f59e0b" stopOpacity={0}/>
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                        <XAxis 
-                          dataKey="timestamp" 
-                          tickFormatter={(t) => new Date(t).toLocaleTimeString()}
-                          stroke="hsl(var(--muted-foreground))"
-                          tick={{ fontSize: 10 }}
-                        />
-                        <YAxis stroke="hsl(var(--muted-foreground))" tick={{ fontSize: 10 }} />
-                        <Area 
-                          type="monotone" 
-                          dataKey="latencyMs" 
-                          stroke="hsl(var(--primary))" 
-                          fill="url(#latencyGradient)"
-                          strokeWidth={2}
-                        />
-                        <Area 
-                          type="monotone" 
-                          dataKey="jitterMs" 
-                          stroke="#f59e0b" 
-                          fill="url(#jitterGradient)"
-                          strokeWidth={2}
-                        />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  ) : liveMetrics?.metrics?.length ? (
-                    <LiveMetricsChart metrics={liveMetrics.metrics} />
-                  ) : (
-                    <div className="h-[200px] flex items-center justify-center text-muted-foreground">
-                      <p>{selectedDevice ? "Connecting to ExtraHop..." : "Select a device to see live metrics"}</p>
-                    </div>
-                  )}
-                  <div className="flex items-center justify-center gap-6 mt-4 text-xs">
-                    <div className="flex items-center gap-2">
-                      <div className="h-2 w-2 rounded-full bg-primary" />
-                      <span>Latency (ms)</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="h-2 w-2 rounded-full bg-amber-400" />
-                      <span>Jitter (ms)</span>
+                </div>
+                
+                <div className="flex items-center justify-between bg-[#0a1520] rounded-lg p-3 border border-cyan-900/30">
+                  <div className="flex items-center gap-3">
+                    <Eye className="h-5 w-5 text-red-400" />
+                    <div>
+                      <p className="font-medium text-sm">Cheater Database</p>
+                      <p className="text-xs text-muted-foreground">Auto-flag known offenders in lobby</p>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-
-              {/* Current Stats from ExtraHop */}
-              <Card className="bg-card/50 backdrop-blur border-border">
-                <CardHeader>
-                  <CardTitle className="text-sm flex items-center gap-2">
-                    <Monitor className="h-4 w-4 text-primary" />
-                    Live Session Stats
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {realtimeMetrics?.dataPoints?.length ? (
-                    <>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <p className="text-xs text-muted-foreground">LATENCY (RTT)</p>
-                          <p className="text-2xl font-mono font-bold text-primary">
-                            {realtimeMetrics.dataPoints[realtimeMetrics.dataPoints.length - 1]?.latencyMs?.toFixed(1) || 0} ms
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">JITTER</p>
-                          <p className="text-2xl font-mono font-bold text-amber-400">
-                            {realtimeMetrics.dataPoints[realtimeMetrics.dataPoints.length - 1]?.jitterMs?.toFixed(1) || 0} ms
-                          </p>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <p className="text-xs text-muted-foreground">PACKET LOSS</p>
-                          <p className="text-lg font-mono text-red-400">
-                            {realtimeMetrics.dataPoints[realtimeMetrics.dataPoints.length - 1]?.packetLoss?.toFixed(2) || 0}%
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">RETRANSMITS</p>
-                          <p className="text-lg font-mono text-orange-400">
-                            {realtimeMetrics.dataPoints[realtimeMetrics.dataPoints.length - 1]?.retransmits || 0}
-                          </p>
-                        </div>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-2">THROUGHPUT (Last Second)</p>
-                        <div className="flex items-center gap-4">
-                          <div className="flex-1">
-                            <p className="text-xs text-muted-foreground">↑ Out</p>
-                            <p className="font-mono">
-                              {((realtimeMetrics.dataPoints[realtimeMetrics.dataPoints.length - 1]?.bytesOut || 0) / 1024).toFixed(1)} KB/s
-                            </p>
-                          </div>
-                          <div className="flex-1">
-                            <p className="text-xs text-muted-foreground">↓ In</p>
-                            <p className="font-mono">
-                              {((realtimeMetrics.dataPoints[realtimeMetrics.dataPoints.length - 1]?.bytesIn || 0) / 1024).toFixed(1)} KB/s
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="pt-2 border-t border-border">
-                        <p className="text-xs text-muted-foreground mb-2">CONNECTED PEERS</p>
-                        <p className="text-lg font-mono text-teal-400">
-                          {realtimePeers?.peers?.length || 0} Guardians
-                        </p>
-                      </div>
-                    </>
-                  ) : liveMetrics?.metrics?.[0] ? (
-                    <>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <p className="text-xs text-muted-foreground">LATENCY</p>
-                          <p className="text-2xl font-mono font-bold text-primary">
-                            {liveMetrics.metrics[0].latencyMs || 0} ms
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">JITTER</p>
-                          <p className="text-2xl font-mono font-bold text-amber-400">
-                            {liveMetrics.metrics[0].jitterMs || 0} ms
-                          </p>
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="h-[200px] flex items-center justify-center text-muted-foreground">
-                      <p>{selectedDevice ? "Waiting for data..." : "Select a device first"}</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+                  <Badge variant="destructive" className="bg-red-500/20 text-red-400 border-red-500/30">
+                    2 THREATS
+                  </Badge>
+                </div>
+              </div>
             </div>
 
-            {/* PCAP Download Section with BPF Filter Builder */}
-            {selectedDevice?.ipaddr4 && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <Card className="bg-card/50 backdrop-blur border-border">
-                  <CardHeader>
-                    <CardTitle className="text-sm flex items-center gap-2">
-                      <Zap className="h-4 w-4 text-amber-400" />
-                      Packet Capture (PCAP)
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <p className="text-sm text-muted-foreground">
-                      Download packet capture for post-game analysis. Use the BPF Filter Builder to customize what traffic to capture.
-                    </p>
-                    <div className="flex flex-col gap-2">
-                      <Button
-                        variant="outline"
-                        className="border-amber-400/50 text-amber-400 hover:bg-amber-400/10"
-                        onClick={() => {
-                          downloadPcapMutation.mutate({
-                            deviceIp: selectedDevice.ipaddr4,
-                            fromMs: Date.now() - 300000, // Last 5 minutes
-                            untilMs: Date.now(),
-                            bpfFilter: activeBpfFilter || undefined,
-                          });
-                        }}
-                        disabled={downloadPcapMutation.isPending}
-                      >
-                        {downloadPcapMutation.isPending ? (
-                          <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                        ) : (
-                          <Zap className="h-4 w-4 mr-2" />
-                        )}
-                        Download Last 5 Min
-                      </Button>
-                      <Button
-                        variant="outline"
-                        className="border-primary/50 text-primary hover:bg-primary/10"
-                        onClick={() => {
-                          downloadPcapMutation.mutate({
-                            deviceIp: selectedDevice.ipaddr4,
-                            fromMs: Date.now() - 60000, // Last 1 minute
-                            untilMs: Date.now(),
-                            bpfFilter: activeBpfFilter || undefined,
-                          });
-                        }}
-                        disabled={downloadPcapMutation.isPending}
-                      >
-                        <Zap className="h-4 w-4 mr-2" />
-                        Download Last 1 Min
-                      </Button>
-                    </div>
-                    {activeBpfFilter && (
-                      <div className="p-2 rounded bg-primary/10 border border-primary/30">
-                        <p className="text-xs text-muted-foreground mb-1">Active Filter:</p>
-                        <code className="text-xs font-mono text-primary">{activeBpfFilter}</code>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-                
-                <BPFFilterBuilder
-                  deviceIp={selectedDevice.ipaddr4}
-                  onFilterChange={(filter) => setActiveBpfFilter(filter)}
-                  initialFilter={activeBpfFilter}
-                />
+            {/* VoIP Comms Array */}
+            <div className="bg-[#0d1a25] rounded-lg p-4 border border-cyan-900/30">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Phone className="h-4 w-4 text-green-400" />
+                  <h2 className="text-sm font-bold text-green-400 uppercase tracking-wider">VoIP Comms Array</h2>
+                </div>
               </div>
-            )}
-          </TabsContent>
+              
+              <div className="grid grid-cols-3 gap-4">
+                <VoIPQualityMeter mos={voipMos} jitter={voipJitter} />
+                <VoiceWaveform data={voipData} />
+              </div>
+            </div>
+          </div>
+        </div>
 
-          {/* Peer Analysis Tab */}
-          <TabsContent value="peers">
-            <Card className="bg-card/50 backdrop-blur border-border">
-              <CardHeader>
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Users className="h-4 w-4 text-primary" />
-                  Connected Guardians ({liveMetrics?.peers?.length || 0})
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {liveMetrics?.peers?.length ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {liveMetrics.peers.map((peer, i) => (
-                      <PeerCard key={i} peer={peer} />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="h-[200px] flex items-center justify-center text-muted-foreground">
-                    <p>No peers connected - start a match to see peer analysis</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
+        {/* Lobby Telemetry Table */}
+        <div className="bg-[#0d1a25] rounded-lg p-4 border border-cyan-900/30">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Radio className="h-4 w-4 text-cyan-400" />
+              <h2 className="text-sm font-bold text-cyan-400 uppercase tracking-wider">Lobby Telemetry</h2>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
+                <div className="h-2 w-2 rounded-full bg-green-400 animate-pulse" />
+                <span className="text-xs text-green-400">LIVE SESSION</span>
+              </div>
+              <FindPS5Dialog onDeviceFound={setSelectedDevice} />
+            </div>
+          </div>
+          
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-cyan-900/30 text-left">
+                  <th className="py-2 px-4 text-xs text-muted-foreground uppercase tracking-wider">Guardian</th>
+                  <th className="py-2 px-4 text-xs text-muted-foreground uppercase tracking-wider">Platform</th>
+                  <th className="py-2 px-4 text-xs text-muted-foreground uppercase tracking-wider">Region</th>
+                  <th className="py-2 px-4 text-xs text-muted-foreground uppercase tracking-wider">Latency</th>
+                  <th className="py-2 px-4 text-xs text-muted-foreground uppercase tracking-wider">Jitter</th>
+                  <th className="py-2 px-4 text-xs text-muted-foreground uppercase tracking-wider">Loss/Threat</th>
+                  <th className="py-2 px-4 text-xs text-muted-foreground uppercase tracking-wider">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lobbyPlayers.map((player, i) => (
+                  <LobbyPlayerRow 
+                    key={i} 
+                    player={player} 
+                    onReport={() => handleReport(player.name)}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
 
-          {/* Timeline Tab */}
-          <TabsContent value="timeline">
-            <Card className="bg-card/50 backdrop-blur border-border">
-              <CardHeader>
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-primary" />
-                  Match Timeline
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ScrollArea className="h-[400px]">
-                  {liveMetrics?.events?.length ? (
-                    <div className="space-y-2">
-                      {liveMetrics.events.map((event, i) => (
-                        <EventItem key={i} event={event} />
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="h-[200px] flex items-center justify-center text-muted-foreground">
-                      <p>No events recorded yet</p>
-                    </div>
-                  )}
-                </ScrollArea>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Match History Tab */}
-          <TabsContent value="history">
-            <Card className="bg-card/50 backdrop-blur border-border">
-              <CardHeader>
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Trophy className="h-4 w-4 text-primary" />
-                  Recent Matches
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {matchHistory?.length ? (
-                  <div className="space-y-3">
-                    {matchHistory.map((match) => (
-                      <div 
-                        key={match.id}
-                        className="flex items-center justify-between p-4 rounded-lg bg-card border border-border/50"
-                      >
-                        <div className="flex items-center gap-4">
-                          <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                            match.result === "victory" ? "bg-green-500/20" : 
-                            match.result === "defeat" ? "bg-red-500/20" : "bg-muted"
-                          }`}>
-                            {match.result === "victory" ? (
-                              <Trophy className="h-5 w-5 text-green-400" />
-                            ) : match.result === "defeat" ? (
-                              <Shield className="h-5 w-5 text-red-400" />
-                            ) : (
-                              <Target className="h-5 w-5 text-muted-foreground" />
-                            )}
-                          </div>
-                          <div>
-                            <p className="font-medium capitalize">{match.gameMode || "Unknown Mode"}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {match.startTime ? new Date(match.startTime).toLocaleDateString() : "—"}
-                              {match.durationMs && ` • ${Math.floor(Number(match.durationMs) / 60000)}m`}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <div className="text-right">
-                            <p className="font-mono text-sm">
-                              {match.avgLatencyMs || "—"} ms avg
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {match.peerCount || 0} peers
-                            </p>
-                          </div>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-amber-400 hover:bg-amber-400/10"
-                                onClick={() => downloadMatchPcapMutation.mutate({ matchId: match.id })}
-                                disabled={downloadMatchPcapMutation.isPending}
-                              >
-                                {downloadMatchPcapMutation.isPending ? (
-                                  <RefreshCw className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <Zap className="h-4 w-4" />
-                                )}
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Download PCAP</TooltipContent>
-                          </Tooltip>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="h-[200px] flex items-center justify-center text-muted-foreground">
-                    <p>No match history yet</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+        {/* Match History Correlation */}
+        <div className="bg-[#0d1a25] rounded-lg p-4 border border-cyan-900/30">
+          <div className="flex items-center gap-2 mb-4">
+            <Timer className="h-4 w-4 text-amber-400" />
+            <h2 className="text-sm font-bold text-amber-400 uppercase tracking-wider">Match History Correlation</h2>
+          </div>
+          
+          <div className="grid grid-cols-3 gap-4">
+            <MatchHistoryCard 
+              mode="Trials of Osiris"
+              kd="2.50"
+              ping="28ms"
+              map="Eternity"
+              netDeaths={4}
+              variant="victory"
+            />
+            <MatchHistoryCard 
+              mode="Competitive"
+              kd="0.80"
+              ping="65ms"
+              map="Pacifica"
+              netDeaths={8}
+              variant="defeat"
+            />
+            <MatchHistoryCard 
+              mode="Iron Banner"
+              kd="1.25"
+              ping="45ms"
+              map="Altar of Flame"
+              netDeaths={5}
+              variant="victory"
+            />
+          </div>
+        </div>
       </main>
+
+      {/* Ghost Voice Alerts */}
+      <GhostVoiceAlerts 
+        currentLatency={latencyData[latencyData.length - 1] || 0}
+        currentPacketLoss={packetLoss * 100}
+        matchState={isCapturing ? "in_match" : "idle"}
+        isMatchActive={isCapturing}
+      />
 
       {/* Lore Chatbot */}
       <LoreChatbot />
